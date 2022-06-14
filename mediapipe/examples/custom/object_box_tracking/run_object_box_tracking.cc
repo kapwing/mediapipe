@@ -49,7 +49,7 @@ std::string graph_config = R"(
         output_stream: "DATA:throttled_input_video"
         node_options: {
           [type.googleapis.com/mediapipe.PacketResamplerCalculatorOptions] {
-            frame_rate: 0.5
+            frame_rate: 3
           }
         }
       }
@@ -85,9 +85,8 @@ absl::Status RunMPPGraph() {
   const bool load_video = !absl::GetFlag(FLAGS_input_video_path).empty();
   if (load_video) {
     capture.open(absl::GetFlag(FLAGS_input_video_path));
-  } else {
-    capture.open(0);
-  }
+  } 
+
   RET_CHECK(capture.isOpened());
 
   if(absl::GetFlag(FLAGS_output_json_path).empty()) return absl::OkStatus();
@@ -109,18 +108,11 @@ absl::Status RunMPPGraph() {
     cv::Mat camera_frame_raw;
     capture >> camera_frame_raw;
     if (camera_frame_raw.empty()) {
-      if (!load_video) {
-        LOG(INFO) << "Ignore empty frames from camera.";
-        continue;
-      }
       LOG(INFO) << "Empty frame, end of video reached.";
       break;
     }
     cv::Mat camera_frame;
     cv::cvtColor(camera_frame_raw, camera_frame, cv::COLOR_BGR2RGB);
-    if (!load_video) {
-      cv::flip(camera_frame, camera_frame, /*flipcode=HORIZONTAL*/ 1);
-    }
 
     // Wrap Mat into an ImageFrame.
     auto input_frame = absl::make_unique<mediapipe::ImageFrame>(
