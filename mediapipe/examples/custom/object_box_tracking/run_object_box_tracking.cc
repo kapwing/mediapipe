@@ -141,9 +141,9 @@ absl::Status RunMPPGraph() {
       file << ",\n";
     }
 
-    file << "{timestamp: " << timestamp_milliseconds / 1000;
+    file << "{\"timestamp\": " << timestamp_milliseconds / 1000;
     if(detections.size() > 0) {
-      file << ", detections: [\n    ";
+      file << ", \"detections\": [\n    ";
     }
 
     for(int i=0; i < detections.size(); i++) {
@@ -156,7 +156,7 @@ absl::Status RunMPPGraph() {
       float height = bounding_box.height() * 100;
 
       if(i > 0) file << ",";
-      file << "{ xMin: " << xMin << ", yMin: " << yMin << ", width: " << width << ", height: " << height << "} ";
+      file << "{ \"xMin\": " << xMin << ", \"yMin\": " << yMin << ", \"width\": " << width << ", \"height\": " << height << "} ";
     }
     if(detections.size() > 0) {
       file << "]";
