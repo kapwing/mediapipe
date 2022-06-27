@@ -148,6 +148,31 @@ absl::Status RunMPPGraph() {
 
     for(int i=0; i < detections.size(); i++) {
       mediapipe::Detection detection = detections.at(i);
+
+
+      // Write ID to file
+      int id = detection.detection_id();
+      file << "{\"id\": " << id << ", ";
+
+      // Write list of labels and scores to file
+      auto num_labels = std::max(detection.label_size(), detection.label_id_size());
+      if(num_labels > 0) {
+        file << "\"labels\": [";
+        for (int i = 0; i < num_labels; ++i) {
+          std::string label = detection.label(i);
+          float score = detection.score(i);
+
+          if(i > 0) {
+            file << ", ";
+          }
+          file << "{\"label\": \"" << label << "\", \"score\": " << score << "}";
+        }
+          
+         file << "], ";
+      }
+
+
+      // Write location data to file
       mediapipe::LocationData location_data = detection.location_data();
       auto& bounding_box = location_data.relative_bounding_box();
       float xMin = bounding_box.xmin() * 100;
@@ -156,7 +181,7 @@ absl::Status RunMPPGraph() {
       float height = bounding_box.height() * 100;
 
       if(i > 0) file << ",";
-      file << "{ \"xMin\": " << xMin << ", \"yMin\": " << yMin << ", \"width\": " << width << ", \"height\": " << height << "} ";
+      file << "\"xMin\": " << xMin << ", \"yMin\": " << yMin << ", \"width\": " << width << ", \"height\": " << height << "} ";
     }
     if(detections.size() > 0) {
       file << "]";
