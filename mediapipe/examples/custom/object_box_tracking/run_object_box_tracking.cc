@@ -149,6 +149,10 @@ absl::Status RunMPPGraph() {
     for(int i=0; i < detections.size(); i++) {
       mediapipe::Detection detection = detections.at(i);
 
+      // add separating comma for items after the first
+      if(i > 0) {
+        file << ", ";
+      }
 
       // Write ID to file
       int id = detection.detection_id();
@@ -158,11 +162,11 @@ absl::Status RunMPPGraph() {
       auto num_labels = std::max(detection.label_size(), detection.label_id_size());
       if(num_labels > 0) {
         file << "\"labels\": [";
-        for (int i = 0; i < num_labels; ++i) {
-          std::string label = detection.label(i);
-          float score = detection.score(i);
+        for (int j = 0; j < num_labels; ++j) {
+          std::string label = detection.label(j);
+          float score = detection.score(j);
 
-          if(i > 0) {
+          if(j > 0) {
             file << ", ";
           }
           file << "{\"label\": \"" << label << "\", \"score\": " << score << "}";
@@ -180,7 +184,6 @@ absl::Status RunMPPGraph() {
       float width = bounding_box.width() * 100;
       float height = bounding_box.height() * 100;
 
-      if(i > 0) file << ",";
       file << "\"xMin\": " << xMin << ", \"yMin\": " << yMin << ", \"width\": " << width << ", \"height\": " << height << "} ";
     }
     if(detections.size() > 0) {
