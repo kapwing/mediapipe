@@ -7,7 +7,9 @@ nav_order: 1
 ![MediaPipe](docs/images/mediapipe_small.png)
 
 --------------------------------------------------------------------------------
+## [Guide to working with Mediapipe at Kapwing](https://www.notion.so/kapwing/Working-with-Mediapipe-6c1b90e272df49f195b1e769de873745)
 
+-------------------------------------------------------------------------------
 ## Live ML anywhere
 
 [MediaPipe](https://google.github.io/mediapipe/) offers cross-platform, customizable
