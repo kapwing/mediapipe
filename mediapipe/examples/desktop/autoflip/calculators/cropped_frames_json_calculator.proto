@@ -1,0 +1,13 @@
+// Cropped Frames Json Calculator
+
+syntax = "proto2";
+
+package mediapipe.autoflip;
+
+import "mediapipe/framework/calculator.proto";
+
+message CroppedFramesJsonCalculatorOptions {
+  extend mediapipe.CalculatorOptions {
+    optional CroppedFramesJsonCalculatorOptions ext = 314159265;
+  }
+}

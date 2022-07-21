@@ -163,11 +163,10 @@ node {
   }
 }
 
-# COMPRESSION: convert cropped frames into JSON keyframe animation
+# EXPORTING: convert cropped frames into JSON keyframe animation
 node {
-  calculator: "CroppedFramesCompressionCalculator"
+  calculator: "CroppedFramesJsonCalculator"
   input_side_packet: "OUTPUT_FILE_PATH:output_video_path"
   input_stream: "CROPPED_FRAMES:cropped_frames"
   input_stream: "VIDEO_PRESTREAM:video_header"
-  output_stream: "STRING:cropped_frames_json"
 }

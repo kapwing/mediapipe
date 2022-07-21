@@ -1,4 +1,4 @@
-// Cropped Frames Compression Calculator
+// Cropped Frames Json Calculator
 //
 // Converts cropped frames to JSON.
 
@@ -10,6 +10,7 @@
 #include "mediapipe/framework/calculator_framework.h"
 #include "mediapipe/framework/formats/image_frame.h"
 #include "mediapipe/framework/formats/image_frame_opencv.h"
+#include "mediapipe/framework/port/file_helpers.h"
 #include "mediapipe/framework/port/ret_check.h"
 #include "mediapipe/framework/port/status.h"
 #include "mediapipe/framework/timestamp.h"
@@ -20,23 +21,21 @@ namespace autoflip {
 constexpr char kOutputFilePathTag[] = "OUTPUT_FILE_PATH";
 constexpr char kCroppedFramesTag[] = "CROPPED_FRAMES";
 constexpr char kVideoPrestreamTag[] = "VIDEO_PRESTREAM";
-constexpr char kStringTag[] = "STRING";
 
 // This calculator converts cropped frames to JSON.
-// CroppedFramesCompressionCalculator::scorer_options.
+// CroppedFramesJsonCalculator::scorer_options.
 // Example:
-//    calculator: "CroppedFramesCompressionCalculator"
+//    calculator: "CroppedFramesJsonCalculator"
 //    input_side_packet: "OUTPUT_FILE_PATH:output_video_path"
 //    input_stream: "CROPPED_FRAMES:cropped_frames"
 //    input_stream: "VIDEO_PRESTREAM:video_header"
-//    output_stream: "STRING:cropped_frames_json"
 //
-class CroppedFramesCompressionCalculator : public CalculatorBase {
+class CroppedFramesJsonCalculator : public CalculatorBase {
  public:
-  CroppedFramesCompressionCalculator();
-  ~CroppedFramesCompressionCalculator() override {}
-  CroppedFramesCompressionCalculator(const CroppedFramesCompressionCalculator&) = delete;
-  CroppedFramesCompressionCalculator& operator=(const CroppedFramesCompressionCalculator&) = delete;
+  CroppedFramesJsonCalculator();
+  ~CroppedFramesJsonCalculator() override {}
+  CroppedFramesJsonCalculator(const CroppedFramesJsonCalculator&) = delete;
+  CroppedFramesJsonCalculator& operator=(const CroppedFramesJsonCalculator&) = delete;
 
   static absl::Status GetContract(mediapipe::CalculatorContract* cc);
   absl::Status Open(mediapipe::CalculatorContext* cc) override;
@@ -47,9 +46,9 @@ class CroppedFramesCompressionCalculator : public CalculatorBase {
   bool emitted_ = false;
 };
 
-REGISTER_CALCULATOR(CroppedFramesCompressionCalculator);
+REGISTER_CALCULATOR(CroppedFramesJsonCalculator);
 
-CroppedFramesCompressionCalculator::CroppedFramesCompressionCalculator() {}
+CroppedFramesJsonCalculator::CroppedFramesJsonCalculator() {}
 
 absl::Status VideoPreStreamCalculator::GetContract(CalculatorContract* cc) {
   if (!cc->Inputs().UsesTags()) {
@@ -92,7 +91,7 @@ absl::Status VideoPreStreamCalculator::Process(CalculatorContext* cc) {
     header_->width = frame.Width();
     header_->height = frame.Height();
     RET_CHECK_NE(header_->frame_rate, 0.0) << "frame rate should be non-zero";
-    cc->Outputs().Index(0).Add(header_.release(), Timestamp::PreStream());
+    cc->Outputs().Index(0).Add(std:format("{}, {}"), Timestamp::PreStream());
     emitted_ = true;
   }
   return absl::OkStatus();

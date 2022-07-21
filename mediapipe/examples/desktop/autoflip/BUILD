@@ -72,7 +72,7 @@ cc_binary(
         "//mediapipe/examples/desktop/autoflip/calculators:shot_boundary_calculator",
         "//mediapipe/examples/desktop/autoflip/calculators:signal_fusing_calculator",
         "//mediapipe/examples/desktop/autoflip/calculators:video_filtering_calculator",
-        "//mediapipe/examples/desktop/autoflip/calculators:cropped_frames_compression_calculator",
+        "//mediapipe/examples/desktop/autoflip/calculators:cropped_frames_json_calculator",
         "//mediapipe/examples/desktop/autoflip/subgraph:autoflip_face_detection_subgraph",
         "//mediapipe/examples/desktop/autoflip/subgraph:autoflip_object_detection_subgraph",
     ],

@@ -515,10 +515,10 @@ cc_test(
 )
 
 cc_library(
-    name = "cropped_frames_compression_calculator",
-    srcs = ["cropped_frames_compression_calculator.cc"],
+    name = "cropped_frames_json_calculator",
+    srcs = ["cropped_frames_json_calculator.cc"],
     deps = [
-        ":cropped_frames_compression_calculator_cc_proto",
+        ":cropped_frames_json_calculator_cc_proto",
         "//mediapipe/examples/desktop/autoflip:autoflip_messages_cc_proto",
         "//mediapipe/framework:calculator_framework",
         "//mediapipe/framework/formats:image_frame",
@@ -532,17 +532,17 @@ cc_library(
 )
 
 proto_library(
-    name = "cropped_frames_compression_calculator_proto",
-    srcs = ["cropped_frames_compression_calculator.proto"],
+    name = "cropped_frames_json_calculator_proto",
+    srcs = ["cropped_frames_json_calculator.proto"],
     deps = [
         "//mediapipe/framework:calculator_proto",
     ],
 )
 
 mediapipe_cc_proto_library(
-    name = "cropped_frames_compression_calculator_cc_proto",
-    srcs = ["cropped_frames_compression_calculator.proto"],
+    name = "cropped_frames_json_calculator_cc_proto",
+    srcs = ["cropped_frames_json_calculator.proto"],
     cc_deps = ["//mediapipe/framework:calculator_cc_proto"],
     visibility = ["//mediapipe/examples:__subpackages__"],
-    deps = [":cropped_frames_compression_calculator_proto"],
+    deps = [":cropped_frames_json_calculator_proto"],
 )
