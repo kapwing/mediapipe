@@ -56,3 +56,24 @@ cc_binary(
         "//mediapipe/examples/desktop/autoflip/subgraph:autoflip_object_detection_subgraph",
     ],
 )
+
+cc_binary(
+    name = "run_custom_autoflip",
+    deps = [
+        "//mediapipe/calculators/core:packet_thinner_calculator",
+        "//mediapipe/calculators/image:scale_image_calculator",
+        "//mediapipe/calculators/video:opencv_video_decoder_calculator",
+        "//mediapipe/calculators/video:video_pre_stream_calculator",
+        "//mediapipe/examples/desktop:simple_run_graph_main",
+        "//mediapipe/examples/desktop/autoflip/calculators:border_detection_calculator",
+        "//mediapipe/examples/desktop/autoflip/calculators:face_to_region_calculator",
+        "//mediapipe/examples/desktop/autoflip/calculators:localization_to_region_calculator",
+        "//mediapipe/examples/desktop/autoflip/calculators:scene_cropping_calculator",
+        "//mediapipe/examples/desktop/autoflip/calculators:shot_boundary_calculator",
+        "//mediapipe/examples/desktop/autoflip/calculators:signal_fusing_calculator",
+        "//mediapipe/examples/desktop/autoflip/calculators:video_filtering_calculator",
+        "//mediapipe/examples/desktop/autoflip/calculators:cropped_frames_compression_calculator",
+        "//mediapipe/examples/desktop/autoflip/subgraph:autoflip_face_detection_subgraph",
+        "//mediapipe/examples/desktop/autoflip/subgraph:autoflip_object_detection_subgraph",
+    ],
+)

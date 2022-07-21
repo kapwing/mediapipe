@@ -513,3 +513,36 @@ cc_test(
         "@com_google_absl//absl/strings",
     ],
 )
+
+cc_library(
+    name = "cropped_frames_compression_calculator",
+    srcs = ["cropped_frames_compression_calculator.cc"],
+    deps = [
+        ":cropped_frames_compression_calculator_cc_proto",
+        "//mediapipe/examples/desktop/autoflip:autoflip_messages_cc_proto",
+        "//mediapipe/framework:calculator_framework",
+        "//mediapipe/framework/formats:image_frame",
+        "//mediapipe/framework/formats:image_frame_opencv",
+        "//mediapipe/framework:timestamp"
+        "//mediapipe/framework/port:ret_check",
+        "//mediapipe/framework/port:status",
+        "@com_google_absl//absl/strings",
+    ],
+    alwayslink = 1,
+)
+
+proto_library(
+    name = "cropped_frames_compression_calculator_proto",
+    srcs = ["cropped_frames_compression_calculator.proto"],
+    deps = [
+        "//mediapipe/framework:calculator_proto",
+    ],
+)
+
+mediapipe_cc_proto_library(
+    name = "cropped_frames_compression_calculator_cc_proto",
+    srcs = ["cropped_frames_compression_calculator.proto"],
+    cc_deps = ["//mediapipe/framework:calculator_cc_proto"],
+    visibility = ["//mediapipe/examples:__subpackages__"],
+    deps = [":cropped_frames_compression_calculator_proto"],
+)

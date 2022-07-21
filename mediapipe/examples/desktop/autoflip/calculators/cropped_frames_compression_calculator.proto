@@ -1,0 +1,13 @@
+// Cropped Frames Compression Calculator
+
+syntax = "proto2";
+
+package mediapipe.autoflip;
+
+import "mediapipe/framework/calculator.proto";
+
+message ContentZoomingCalculatorOptions {
+  extend mediapipe.CalculatorOptions {
+    optional ContentZoomingCalculatorOptions ext = 314159265;
+  }
+}
