@@ -57,7 +57,7 @@ absl::Status VideoPreStreamCalculator::GetContract(CalculatorContract* cc) {
     cc->Inputs().Tag(kCroppedFramesTag).Set<ImageFrame>();
     cc->Inputs().Tag(kVideoPrestreamTag).Set<VideoHeader>();
   }
-  cc->Outputs().Index(0).Set<VideoHeader>();
+  
   return absl::OkStatus();
 }
 
@@ -91,7 +91,9 @@ absl::Status VideoPreStreamCalculator::Process(CalculatorContext* cc) {
     header_->width = frame.Width();
     header_->height = frame.Height();
     RET_CHECK_NE(header_->frame_rate, 0.0) << "frame rate should be non-zero";
-    cc->Outputs().Index(0).Add(std:format("{}, {}"), Timestamp::PreStream());
+
+    // todo (david): convert to json and save to file
+    //std:format("{}, {}", header_->width, header_->height), Timestamp::PreStream());
     emitted_ = true;
   }
   return absl::OkStatus();
