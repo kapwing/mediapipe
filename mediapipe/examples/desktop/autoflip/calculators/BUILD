@@ -523,7 +523,8 @@ cc_library(
         "//mediapipe/framework:calculator_framework",
         "//mediapipe/framework/formats:image_frame",
         "//mediapipe/framework/formats:image_frame_opencv",
-        "//mediapipe/framework:timestamp"
+        "//mediapipe/framework/formats:video_stream_header",
+        "//mediapipe/framework:timestamp",
         "//mediapipe/framework/port:ret_check",
         "//mediapipe/framework/port:status",
         "@com_google_absl//absl/strings",
