@@ -140,14 +140,14 @@ node {
 
 # CROPPING: make decisions about how to crop each frame.
 node {
-  calculator: "SceneCroppingCalculator"
+  calculator: "SceneCroppingCoordinatesCalculator"
   input_side_packet: "EXTERNAL_ASPECT_RATIO:aspect_ratio"
   input_stream: "VIDEO_FRAMES:video_raw"
   input_stream: "KEY_FRAMES:video_frames_scaled_downsampled"
   input_stream: "DETECTION_FEATURES:salient_regions"
   input_stream: "STATIC_FEATURES:borders"
   input_stream: "SHOT_BOUNDARIES:shot_change"
-  output_stream: "CROPPED_FRAMES:cropped_frames"
+  output_stream: "CROP_BOUNDARIES:crop_boundaries"
   options: {
     [mediapipe.autoflip.SceneCroppingCalculatorOptions.ext]: {
       max_scene_size: 500
@@ -167,6 +167,6 @@ node {
 node {
   calculator: "CroppedFramesJsonCalculator"
   input_side_packet: "OUTPUT_FILE_PATH:output_json_path"
-  input_stream: "CROPPED_FRAMES:cropped_frames"
+  input_stream: "CROP_BOUNDARIES:crop_boundaries"
   input_stream: "VIDEO_PRESTREAM:video_header"
 }

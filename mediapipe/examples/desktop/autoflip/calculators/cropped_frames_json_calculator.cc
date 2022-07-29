@@ -4,9 +4,12 @@
 
 #include <algorithm>
 #include <memory>
+#include <fstream>
 
 #include "absl/memory/memory.h"
 #include "absl/strings/str_format.h"
+#include "mediapipe/examples/desktop/autoflip/quality/scene_cropping_viz.h"
+#include "mediapipe/examples/desktop/autoflip/quality/utils.h"
 #include "mediapipe/framework/calculator_framework.h"
 #include "mediapipe/framework/formats/image_frame.h"
 #include "mediapipe/framework/formats/image_frame_opencv.h"
@@ -20,7 +23,7 @@ namespace mediapipe {
 namespace autoflip {
 
 constexpr char kOutputFilePathTag[] = "OUTPUT_FILE_PATH";
-constexpr char kCroppedFramesTag[] = "CROPPED_FRAMES";
+constexpr char kCropBoundariesTag[] = "CROP_BOUNDARIES";
 constexpr char kVideoPrestreamTag[] = "VIDEO_PRESTREAM";
 
 // This calculator converts cropped frames to JSON.
@@ -41,10 +44,11 @@ class CroppedFramesJsonCalculator : public CalculatorBase {
   static absl::Status GetContract(mediapipe::CalculatorContract* cc);
   absl::Status Open(mediapipe::CalculatorContext* cc) override;
   absl::Status Process(mediapipe::CalculatorContext* cc) override;
+  absl::Status Close(mediapipe::CalculatorContext* cc) override;
 
  private:
-  std::unique_ptr<VideoHeader> header_;
-  bool emitted_ = false;
+  double frame_rate_;
+  std::ofstream json_file_;
 };
 
 REGISTER_CALCULATOR(CroppedFramesJsonCalculator);
@@ -52,56 +56,54 @@ REGISTER_CALCULATOR(CroppedFramesJsonCalculator);
 CroppedFramesJsonCalculator::CroppedFramesJsonCalculator() {}
 
 absl::Status CroppedFramesJsonCalculator::GetContract(CalculatorContract* cc) {
-  if (!cc->Inputs().UsesTags()) {
-    cc->Inputs().Index(0).Set<ImageFrame>();
-  } else {
-    cc->Inputs().Tag(kCroppedFramesTag).Set<ImageFrame>();
-    cc->Inputs().Tag(kVideoPrestreamTag).Set<VideoHeader>();
-  }
-
+  RET_CHECK(cc->Inputs().UsesTags());
+  RET_CHECK(cc->Inputs().HasTag(kCropBoundariesTag));
+  RET_CHECK(cc->Inputs().HasTag(kVideoPrestreamTag));
   RET_CHECK(cc->InputSidePackets().HasTag(kOutputFilePathTag));
+
+  cc->Inputs().Tag(kCropBoundariesTag).Set<LinearSceneCropSummary>();
+  cc->Inputs().Tag(kVideoPrestreamTag).Set<VideoHeader>();
+  cc->InputSidePackets().Tag(kOutputFilePathTag).Set<std::string>();
   
   return absl::OkStatus();
 }
 
 absl::Status CroppedFramesJsonCalculator::Open(CalculatorContext* cc) {
-  bool frame_rate_in_prestream = cc->Inputs().UsesTags() &&
-                             cc->Inputs().HasTag(kCroppedFramesTag) &&
-                             cc->Inputs().HasTag(kVideoPrestreamTag);
-  RET_CHECK(frame_rate_in_prestream) << "frame rate must be in prestream";
-  header_ = absl::make_unique<VideoHeader>();
+  json_file_.open(cc->InputSidePackets().Tag(kOutputFilePathTag).Get<std::string>());
+  json_file_ << "[";
+
   return absl::OkStatus();
 }
 
 absl::Status CroppedFramesJsonCalculator::Process(CalculatorContext* cc) {
   cc->GetCounter("Process")->Increment();
-
-  if (emitted_) {
-    return absl::OkStatus();
-  }
   
   if (cc->InputTimestamp() == Timestamp::PreStream()) {
-    RET_CHECK(cc->Inputs().Tag(kCroppedFramesTag).IsEmpty());
+    RET_CHECK(cc->Inputs().Tag(kCropBoundariesTag).IsEmpty());
     RET_CHECK(!cc->Inputs().Tag(kVideoPrestreamTag).IsEmpty());
-    *header_ = cc->Inputs().Tag(kVideoPrestreamTag).Get<VideoHeader>();
-    RET_CHECK_NE(header_->frame_rate, 0.0) << "frame rate should be non-zero";
+    frame_rate_ = cc->Inputs().Tag(kVideoPrestreamTag).Get<VideoHeader>().frame_rate;
+    RET_CHECK_NE(frame_rate_, 0.0) << "frame rate should be non-zero";
   } else {
     RET_CHECK(cc->Inputs().Tag(kVideoPrestreamTag).IsEmpty())
         << "Packet on VIDEO_PRESTREAM must come in at Timestamp::PreStream().";
-    RET_CHECK(!cc->Inputs().Tag(kCroppedFramesTag).IsEmpty());
-    const auto& frame = cc->Inputs().Tag(kCroppedFramesTag).Get<ImageFrame>();
-    //header_->format = frame.Format();
-    //header_->width = frame.Width();
-    //header_->height = frame.Height();
-    RET_CHECK_NE(header_->frame_rate, 0.0) << "frame rate should be non-zero";
+    RET_CHECK(!cc->Inputs().Tag(kCropBoundariesTag).IsEmpty());
+    RET_CHECK_NE(frame_rate_, 0.0) << "frame rate should be non-zero";
+    LinearSceneCropSummary scene_crop_summary = cc->Inputs().Tag(kCropBoundariesTag)
+        .Get<LinearSceneCropSummary>();
+    
 
     // todo (david): convert to json and save to file
-    std::cout << header_->frame_rate << std::endl;
     //std:format("{}, {}", header_->width, header_->height), Timestamp::PreStream());
-    emitted_ = true;
   }
   return absl::OkStatus();
 }
+
+absl::Status CroppedFramesJsonCalculator::Close(CalculatorContext* cc) {
+  json_file_ << "]";
+  json_file_.close();
+}
+
+REGISTER_CALCULATOR(CroppedFramesJsonCalculator);
 
 }  // namespace autoflip
 }  // namespace mediapipe

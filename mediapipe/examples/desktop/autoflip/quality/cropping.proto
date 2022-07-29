@@ -144,6 +144,23 @@ message SceneKeyFrameCropSummary {
   optional float vertical_motion_amount = 18;
 }
 
+message LinearSceneCropSummary {
+  // Scene frame size.
+  optional int32 scene_frame_width = 1;
+  optional int32 scene_frame_height = 2;
+
+  // Scene length.
+  optional int32 num_frames = 3;
+
+  // Initial position.
+  optional float initial_x = 4;
+  optional float initial_y = 5;
+
+  // Final position.
+  optional float final_x = 6;
+  optional float final_y = 7;
+}
+
 // Scene camera motion determined by the SceneCameraMotionAnalyzer class.
 message SceneCameraMotion {
   // Camera focuses on a fixed center throughout the scene.
