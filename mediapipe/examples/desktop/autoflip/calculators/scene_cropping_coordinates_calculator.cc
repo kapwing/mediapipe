@@ -571,10 +571,8 @@ absl::Status SceneCroppingCoordinatesCalculator::ProcessScene(const bool is_end_
     cv::Rect initial_crop_rect = crop_from_locations.front();
     LinearSceneCropSummary new_linear_scene_crop_summary_;
 
-    new_linear_scene_crop_summary_.set_scene_frame_width(
-        scene_summary.scene_frame_width());
-    new_linear_scene_crop_summary_.set_scene_frame_height(
-        scene_summary.scene_frame_height());
+    new_linear_scene_crop_summary_.set_width(scene_summary.scene_frame_width());
+    new_linear_scene_crop_summary_.set_height(scene_summary.scene_frame_height());
     new_linear_scene_crop_summary_.set_num_frames(scene_summary.num_key_frames());
     new_linear_scene_crop_summary_.set_initial_x(initial_crop_rect.x);
     new_linear_scene_crop_summary_.set_initial_y(initial_crop_rect.y);

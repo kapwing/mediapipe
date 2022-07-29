@@ -146,8 +146,8 @@ message SceneKeyFrameCropSummary {
 
 message LinearSceneCropSummary {
   // Scene frame size.
-  optional int32 scene_frame_width = 1;
-  optional int32 scene_frame_height = 2;
+  optional int32 width = 1;
+  optional int32 height = 2;
 
   // Scene length.
   optional int32 num_frames = 3;

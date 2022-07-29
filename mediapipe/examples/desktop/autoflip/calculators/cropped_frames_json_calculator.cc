@@ -48,10 +48,9 @@ class CroppedFramesJsonCalculator : public CalculatorBase {
 
  private:
   double frame_rate_;
+  //bool is_first_scene_ = true;
   std::ofstream json_file_;
 };
-
-REGISTER_CALCULATOR(CroppedFramesJsonCalculator);
 
 CroppedFramesJsonCalculator::CroppedFramesJsonCalculator() {}
 
@@ -76,7 +75,7 @@ absl::Status CroppedFramesJsonCalculator::Open(CalculatorContext* cc) {
 }
 
 absl::Status CroppedFramesJsonCalculator::Process(CalculatorContext* cc) {
-  cc->GetCounter("Process")->Increment();
+  cc->GetCounter("JSON Conversions")->Increment();
   
   if (cc->InputTimestamp() == Timestamp::PreStream()) {
     RET_CHECK(cc->Inputs().Tag(kCropBoundariesTag).IsEmpty());
@@ -90,10 +89,20 @@ absl::Status CroppedFramesJsonCalculator::Process(CalculatorContext* cc) {
     RET_CHECK_NE(frame_rate_, 0.0) << "frame rate should be non-zero";
     LinearSceneCropSummary scene_crop_summary = cc->Inputs().Tag(kCropBoundariesTag)
         .Get<LinearSceneCropSummary>();
-    
 
-    // todo (david): convert to json and save to file
-    //std:format("{}, {}", header_->width, header_->height), Timestamp::PreStream());
+    if (is_first_scene_) {
+      is_first_scene_ = false;
+    } else {
+      json_file_ << ",";
+    }
+    
+    json_file_ << "{\"width\":" << scene_crop_summary.width() << ",";
+    json_file_ << "\"height\":" << scene_crop_summary.height() << ",";
+    json_file_ << "\"numFrames\":" << scene_crop_summary.num_frames() << ",";
+    json_file_ << "\"initialX\":" << scene_crop_summary.initial_x() << ",";
+    json_file_ << "\"initialY\":" << scene_crop_summary.initial_y() << ",";
+    json_file_ << "\"finalX\":" << scene_crop_summary.final_x() << ",";
+    json_file_ << "\"finalY\":" << scene_crop_summary.final_y() << "}";
   }
   return absl::OkStatus();
 }
