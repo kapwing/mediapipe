@@ -48,9 +48,12 @@ class CroppedFramesJsonCalculator : public CalculatorBase {
 
  private:
   double frame_rate_;
-  //bool is_first_scene_ = true;
+  bool is_first_scene_ = true;
+  std::string file_name_;
   std::ofstream json_file_;
 };
+
+REGISTER_CALCULATOR(CroppedFramesJsonCalculator);
 
 CroppedFramesJsonCalculator::CroppedFramesJsonCalculator() {}
 
@@ -68,7 +71,8 @@ absl::Status CroppedFramesJsonCalculator::GetContract(CalculatorContract* cc) {
 }
 
 absl::Status CroppedFramesJsonCalculator::Open(CalculatorContext* cc) {
-  json_file_.open(cc->InputSidePackets().Tag(kOutputFilePathTag).Get<std::string>());
+  file_name_ = cc->InputSidePackets().Tag(kOutputFilePathTag).Get<std::string>();
+  json_file_.open(file_name_, std::ios_base::trunc);
   json_file_ << "[";
 
   return absl::OkStatus();
@@ -108,11 +112,16 @@ absl::Status CroppedFramesJsonCalculator::Process(CalculatorContext* cc) {
 }
 
 absl::Status CroppedFramesJsonCalculator::Close(CalculatorContext* cc) {
-  json_file_ << "]";
-  json_file_.close();
-}
+  if (cc->GraphStatus().ok()) {
+    json_file_ << "]";
+    json_file_.close();
+  } else if (json_file_.is_open()) {
+    std::remove(file_name_.c_str());
+    json_file_.close();
+  }
 
-REGISTER_CALCULATOR(CroppedFramesJsonCalculator);
+  return absl::OkStatus();
+}
 
 }  // namespace autoflip
 }  // namespace mediapipe

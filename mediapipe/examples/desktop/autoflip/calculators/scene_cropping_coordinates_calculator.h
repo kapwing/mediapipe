@@ -166,29 +166,6 @@ class SceneCroppingCoordinatesCalculator : public CalculatorBase {
   // 7. Optionally updates cropping summary.
   absl::Status ProcessScene(const bool is_end_of_scene, CalculatorContext* cc);
 
-  // Formats and outputs the cropped frames passed in through
-  // |cropped_frames_ptr|. Scales them to be at least as big as the target
-  // size. If the aspect ratio is different, applies padding. Uses solid
-  // background from static features if possible, otherwise uses blurred
-  // background. Sets |apply_padding| to true if the scene is padded. Set
-  // |cropped_frames_ptr| to nullptr, to bypass the actual output of the
-  // cropped frames. This is useful when the calculator is only used for
-  // computing the cropping metadata rather than doing the actual cropping
-  // operation.
-  absl::Status FormatAndOutputCroppedFrames(
-      const int crop_width, const int crop_height, const int num_frames,
-      std::vector<cv::Rect>* render_to_locations, bool* apply_padding,
-      std::vector<cv::Scalar>* padding_colors, float* vertical_fill_percent,
-      const std::vector<cv::Mat>* cropped_frames_ptr, CalculatorContext* cc);
-
-  // Draws and outputs visualization frames if those streams are present.
-  absl::Status OutputVizFrames(
-      const std::vector<KeyFrameCropResult>& key_frame_crop_results,
-      const std::vector<FocusPointFrame>& focus_point_frames,
-      const std::vector<cv::Rect>& crop_from_locations,
-      const int crop_window_width, const int crop_window_height,
-      CalculatorContext* cc) const;
-
   // Filters detections based on USER_HINT under specific flag conditions.
   void FilterKeyFrameInfo();
 
@@ -278,9 +255,6 @@ class SceneCroppingCoordinatesCalculator : public CalculatorBase {
 
   // Optional list of external rendering messages for each processed frame.
   std::unique_ptr<std::vector<ExternalRenderFrame>> external_render_list_;
-
-  std::unique_ptr<LinearSceneCropSummary> active_linear_scene_crop_summary_ =
-      nullptr;
 };
 }  // namespace autoflip
 }  // namespace mediapipe
