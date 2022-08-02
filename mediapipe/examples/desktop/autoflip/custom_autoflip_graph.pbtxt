@@ -156,7 +156,7 @@ node {
       }
       scene_camera_motion_analyzer_options: {
         motion_stabilization_threshold_percent: 0.9
-        salient_point_bound: 0.6
+        salient_point_bound: 0.5
       }
       target_size_type: MAXIMIZE_TARGET_DIMENSION
     }

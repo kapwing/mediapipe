@@ -255,6 +255,8 @@ class SceneCroppingCoordinatesCalculator : public CalculatorBase {
 
   // Optional list of external rendering messages for each processed frame.
   std::unique_ptr<std::vector<ExternalRenderFrame>> external_render_list_;
+
+  int cur_scene_frames_ = 0;
 };
 }  // namespace autoflip
 }  // namespace mediapipe

@@ -92,28 +92,9 @@ absl::Status SceneCroppingCoordinatesCalculator::GetContract(
   if (cc->Inputs().HasTag(kInputShotBoundaries)) {
     cc->Inputs().Tag(kInputShotBoundaries).Set<bool>();
   }
-
   if (cc->Outputs().HasTag(kOutputCropBoundaries)) {
     cc->Outputs().Tag(kOutputCropBoundaries).Set<LinearSceneCropSummary>();
   }
-  /*if (cc->Outputs().HasTag(kOutputKeyFrameCropViz)) {
-    RET_CHECK(cc->Outputs().HasTag(kOutputCroppedFrames))
-        << "KEY_FRAME_CROP_REGION_VIZ_FRAMES can only be used when "
-           "CROPPED_FRAMES is specified.";
-    cc->Outputs().Tag(kOutputKeyFrameCropViz).Set<ImageFrame>();
-  }
-  if (cc->Outputs().HasTag(kOutputFramingAndDetections)) {
-    RET_CHECK(cc->Outputs().HasTag(kOutputCroppedFrames))
-        << "FRAMING_DETECTIONS_VIZ_FRAMES can only be used when "
-           "CROPPED_FRAMES is specified.";
-    cc->Outputs().Tag(kOutputFramingAndDetections).Set<ImageFrame>();
-  }
-  if (cc->Outputs().HasTag(kOutputFocusPointFrameViz)) {
-    RET_CHECK(cc->Outputs().HasTag(kOutputCroppedFrames))
-        << "SALIENT_POINT_FRAME_VIZ_FRAMES can only be used when "
-           "CROPPED_FRAMES is specified.";
-    cc->Outputs().Tag(kOutputFocusPointFrameViz).Set<ImageFrame>();
-  }*/
   if (cc->Outputs().HasTag(kOutputSummary)) {
     cc->Outputs().Tag(kOutputSummary).Set<VideoCroppingSummary>();
   }
@@ -347,6 +328,7 @@ bool HasFrameSignal(mediapipe::CalculatorContext* cc) {
 
 absl::Status SceneCroppingCoordinatesCalculator::Process(
     mediapipe::CalculatorContext* cc) {
+  cur_scene_frames_++;
 
   // Sets frame dimension and initializes SceneCroppingCoordinatesCalculator on first video
   // frame.
@@ -577,7 +559,7 @@ absl::Status SceneCroppingCoordinatesCalculator::ProcessScene(const bool is_end_
 
   new_linear_scene_crop_summary_->set_width(scene_summary.crop_window_width());
   new_linear_scene_crop_summary_->set_height(scene_summary.crop_window_height());
-  new_linear_scene_crop_summary_->set_num_frames(scene_summary.num_key_frames());
+  new_linear_scene_crop_summary_->set_num_frames(cur_scene_frames_);
   new_linear_scene_crop_summary_->set_initial_x(initial_crop_rect.x);
   new_linear_scene_crop_summary_->set_initial_y(initial_crop_rect.y);
   new_linear_scene_crop_summary_->set_final_x(final_crop_rect.x);
@@ -593,6 +575,7 @@ absl::Status SceneCroppingCoordinatesCalculator::ProcessScene(const bool is_end_
   is_key_frames_.clear();
   static_features_.clear();
   static_features_timestamps_.clear();
+  cur_scene_frames_ = 0;
 
   return absl::OkStatus();
 }

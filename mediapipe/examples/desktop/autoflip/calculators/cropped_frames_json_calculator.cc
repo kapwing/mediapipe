@@ -99,14 +99,16 @@ absl::Status CroppedFramesJsonCalculator::Process(CalculatorContext* cc) {
     } else {
       json_file_ << ",";
     }
+
+    float scene_time_ = scene_crop_summary.num_frames() / frame_rate_;
     
-    json_file_ << "{\"width\":" << scene_crop_summary.width() << ",";
-    json_file_ << "\"height\":" << scene_crop_summary.height() << ",";
-    json_file_ << "\"numFrames\":" << scene_crop_summary.num_frames() << ",";
-    json_file_ << "\"initialX\":" << scene_crop_summary.initial_x() << ",";
-    json_file_ << "\"initialY\":" << scene_crop_summary.initial_y() << ",";
-    json_file_ << "\"finalX\":" << scene_crop_summary.final_x() << ",";
-    json_file_ << "\"finalY\":" << scene_crop_summary.final_y() << "}";
+    json_file_ << "{\"width\":" << scene_crop_summary.width()
+        << ",\"height\":" << scene_crop_summary.height()
+        << ",\"time\":" << scene_time_
+        << ",\"initialPos\":{\"x\":" << scene_crop_summary.initial_x()
+        << ",\"y\":" << scene_crop_summary.initial_y()
+        << "},\"finalPos\":{\"x\":" << scene_crop_summary.final_x()
+        << ",\"y\":" << scene_crop_summary.final_y() << "}}";
   }
   return absl::OkStatus();
 }
