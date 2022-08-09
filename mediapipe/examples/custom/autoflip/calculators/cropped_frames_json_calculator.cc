@@ -1,6 +1,7 @@
 // Cropped Frames Json Calculator
 //
 // Converts cropped frames to JSON.
+// Based on video_pre_stream_calculator.cc
 
 #include <algorithm>
 #include <memory>
@@ -100,11 +101,11 @@ absl::Status CroppedFramesJsonCalculator::Process(CalculatorContext* cc) {
       json_file_ << ",";
     }
 
-    float scene_time_ = scene_crop_summary.num_frames() / frame_rate_;
+    float scene_time = scene_crop_summary.num_frames() / frame_rate_;
     
     json_file_ << "{\"width\":" << scene_crop_summary.width()
         << ",\"height\":" << scene_crop_summary.height()
-        << ",\"time\":" << scene_time_
+        << ",\"time\":" << scene_time
         << ",\"initialPos\":{\"x\":" << scene_crop_summary.initial_x()
         << ",\"y\":" << scene_crop_summary.initial_y()
         << "},\"finalPos\":{\"x\":" << scene_crop_summary.final_x()

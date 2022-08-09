@@ -150,13 +150,13 @@ node {
   output_stream: "CROP_BOUNDARIES:crop_boundaries"
   options: {
     [mediapipe.autoflip.SceneCroppingCoordinatesCalculatorOptions.ext]: {
-      max_scene_size: 600
+      max_scene_size: 200
       key_frame_crop_options: {
         score_aggregation_type: CONSTANT
       }
       scene_camera_motion_analyzer_options: {
         motion_stabilization_threshold_percent: 0.9
-        salient_point_bound: 0.5
+        salient_point_bound: 0.6
       }
       target_size_type: MAXIMIZE_TARGET_DIMENSION
     }
