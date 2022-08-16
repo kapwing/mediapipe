@@ -64,7 +64,7 @@ absl::Status CroppedFramesJsonCalculator::GetContract(CalculatorContract* cc) {
   RET_CHECK(cc->Inputs().HasTag(kVideoPrestreamTag));
   RET_CHECK(cc->InputSidePackets().HasTag(kOutputFilePathTag));
 
-  cc->Inputs().Tag(kCropBoundariesTag).Set<LinearSceneCropSummary>();
+  cc->Inputs().Tag(kCropBoundariesTag).Set<StaticSceneCropSummary>();
   cc->Inputs().Tag(kVideoPrestreamTag).Set<VideoHeader>();
   cc->InputSidePackets().Tag(kOutputFilePathTag).Set<std::string>();
   
@@ -92,8 +92,8 @@ absl::Status CroppedFramesJsonCalculator::Process(CalculatorContext* cc) {
         << "Packet on VIDEO_PRESTREAM must come in at Timestamp::PreStream().";
     RET_CHECK(!cc->Inputs().Tag(kCropBoundariesTag).IsEmpty());
     RET_CHECK_NE(frame_rate_, 0.0) << "frame rate should be non-zero";
-    LinearSceneCropSummary scene_crop_summary = cc->Inputs().Tag(kCropBoundariesTag)
-        .Get<LinearSceneCropSummary>();
+    StaticSceneCropSummary static_scene_crop_summary = cc->Inputs().Tag(kCropBoundariesTag)
+        .Get<StaticSceneCropSummary>();
 
     if (is_first_scene_) {
       is_first_scene_ = false;
@@ -101,15 +101,14 @@ absl::Status CroppedFramesJsonCalculator::Process(CalculatorContext* cc) {
       json_file_ << ",";
     }
 
-    float scene_time = scene_crop_summary.num_frames() / frame_rate_;
+    float scene_time = static_scene_crop_summary.num_frames() / frame_rate_;
     
-    json_file_ << "{\"width\":" << scene_crop_summary.width()
-        << ",\"height\":" << scene_crop_summary.height()
+    json_file_ << "{\"width\":" << static_scene_crop_summary.width()
+        << ",\"height\":" << static_scene_crop_summary.height()
         << ",\"time\":" << scene_time
-        << ",\"initialPos\":{\"x\":" << scene_crop_summary.initial_x()
-        << ",\"y\":" << scene_crop_summary.initial_y()
-        << "},\"finalPos\":{\"x\":" << scene_crop_summary.final_x()
-        << ",\"y\":" << scene_crop_summary.final_y() << "}}";
+        << ",\"x\":" << static_scene_crop_summary.x()
+        << ",\"y\":" << static_scene_crop_summary.y()
+        << "}";
   }
   return absl::OkStatus();
 }

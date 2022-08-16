@@ -84,7 +84,7 @@ absl::Status SceneCroppingCoordinatesCalculator::GetContract(
     cc->Inputs().Tag(kInputShotBoundaries).Set<bool>();
   }
   if (cc->Outputs().HasTag(kOutputCropBoundaries)) {
-    cc->Outputs().Tag(kOutputCropBoundaries).Set<LinearSceneCropSummary>();
+    cc->Outputs().Tag(kOutputCropBoundaries).Set<StaticSceneCropSummary>();
   }
   if (cc->Outputs().HasTag(kOutputSummary)) {
     cc->Outputs().Tag(kOutputSummary).Set<VideoCroppingSummary>();
@@ -542,22 +542,19 @@ absl::Status SceneCroppingCoordinatesCalculator::ProcessScene(const bool is_end_
       top_static_border_size, bottom_static_border_size, continue_last_scene_,
       &crop_from_locations, nullptr));
 
-  cv::Rect initial_crop_rect = crop_from_locations.front();
-  cv::Rect final_crop_rect = crop_from_locations.back();
+  cv::Rect crop_rect = crop_from_locations.front();
 
-  std::unique_ptr<LinearSceneCropSummary> new_linear_scene_crop_summary_ =
-      std::make_unique<LinearSceneCropSummary>();
+  std::unique_ptr<StaticSceneCropSummary> new_static_scene_crop_summary_ =
+      std::make_unique<StaticSceneCropSummary>();
 
-  new_linear_scene_crop_summary_->set_width(scene_summary.crop_window_width());
-  new_linear_scene_crop_summary_->set_height(scene_summary.crop_window_height());
-  new_linear_scene_crop_summary_->set_num_frames(cur_scene_frames_);
-  new_linear_scene_crop_summary_->set_initial_x(initial_crop_rect.x);
-  new_linear_scene_crop_summary_->set_initial_y(initial_crop_rect.y);
-  new_linear_scene_crop_summary_->set_final_x(final_crop_rect.x);
-  new_linear_scene_crop_summary_->set_final_y(final_crop_rect.y);
+  new_static_scene_crop_summary_->set_width(scene_summary.crop_window_width());
+  new_static_scene_crop_summary_->set_height(scene_summary.crop_window_height());
+  new_static_scene_crop_summary_->set_num_frames(cur_scene_frames_);
+  new_static_scene_crop_summary_->set_x(crop_rect.x);
+  new_static_scene_crop_summary_->set_y(crop_rect.y);
 
   cc->Outputs().Tag(kOutputCropBoundaries)
-      .Add(new_linear_scene_crop_summary_.release(),
+      .Add(new_static_scene_crop_summary_.release(),
           Timestamp(scene_frame_timestamps_.back()));
 
   key_frame_infos_.clear();

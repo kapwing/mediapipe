@@ -155,8 +155,9 @@ node {
         score_aggregation_type: CONSTANT
       }
       scene_camera_motion_analyzer_options: {
-        motion_stabilization_threshold_percent: 0.9
-        salient_point_bound: 0.6
+        motion_stabilization_threshold_percent: 1
+        salient_point_bound: 0.499
+        allow_sweeping: false
       }
       target_size_type: MAXIMIZE_TARGET_DIMENSION
     }
