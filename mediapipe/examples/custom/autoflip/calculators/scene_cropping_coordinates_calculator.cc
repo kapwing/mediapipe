@@ -544,17 +544,17 @@ absl::Status SceneCroppingCoordinatesCalculator::ProcessScene(const bool is_end_
 
   cv::Rect crop_rect = crop_from_locations.front();
 
-  std::unique_ptr<StaticSceneCropSummary> new_static_scene_crop_summary_ =
+  std::unique_ptr<StaticSceneCropSummary> new_static_scene_crop_summary =
       std::make_unique<StaticSceneCropSummary>();
 
-  new_static_scene_crop_summary_->set_width(scene_summary.crop_window_width());
-  new_static_scene_crop_summary_->set_height(scene_summary.crop_window_height());
-  new_static_scene_crop_summary_->set_num_frames(cur_scene_frames_);
-  new_static_scene_crop_summary_->set_x(crop_rect.x);
-  new_static_scene_crop_summary_->set_y(crop_rect.y);
+  new_static_scene_crop_summary->set_width(scene_summary.crop_window_width());
+  new_static_scene_crop_summary->set_height(scene_summary.crop_window_height());
+  new_static_scene_crop_summary->set_num_frames(cur_scene_frames_);
+  new_static_scene_crop_summary->set_x(crop_rect.x);
+  new_static_scene_crop_summary->set_y(crop_rect.y);
 
   cc->Outputs().Tag(kOutputCropBoundaries)
-      .Add(new_static_scene_crop_summary_.release(),
+      .Add(new_static_scene_crop_summary.release(),
           Timestamp(scene_frame_timestamps_.back()));
 
   key_frame_infos_.clear();
