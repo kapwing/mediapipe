@@ -547,11 +547,32 @@ absl::Status SceneCroppingCoordinatesCalculator::ProcessScene(const bool is_end_
   std::unique_ptr<StaticSceneCropSummary> new_static_scene_crop_summary =
       std::make_unique<StaticSceneCropSummary>();
 
-  new_static_scene_crop_summary->set_width(scene_summary.crop_window_width());
-  new_static_scene_crop_summary->set_height(scene_summary.crop_window_height());
+  int x = crop_rect.x;
+  int y = crop_rect.y;
+  int width = scene_summary.crop_window_width();
+  int height = scene_summary.crop_window_height();
+  int expected_width = height * target_aspect_ratio_;
+  int expected_height = width / target_aspect_ratio_;
+
+  if (width < expected_width) {
+    if (x == 0) {
+      x = width - expected_width;
+    }
+
+    width = expected_width;
+  } else if (height < expected_height) {
+    if (y == 0) {
+      y = height - expected_height;
+    }
+
+    height = expected_height;
+  }
+
+  new_static_scene_crop_summary->set_width(width);
+  new_static_scene_crop_summary->set_height(height);
   new_static_scene_crop_summary->set_num_frames(cur_scene_frames_);
-  new_static_scene_crop_summary->set_x(crop_rect.x);
-  new_static_scene_crop_summary->set_y(crop_rect.y);
+  new_static_scene_crop_summary->set_x(x);
+  new_static_scene_crop_summary->set_y(y);
 
   cc->Outputs().Tag(kOutputCropBoundaries)
       .Add(new_static_scene_crop_summary.release(),

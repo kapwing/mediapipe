@@ -153,8 +153,8 @@ message StaticSceneCropSummary {
   optional int32 num_frames = 3;
 
   // Static scene position.
-  optional float x = 4;
-  optional float y = 5;
+  optional int32 x = 4;
+  optional int32 y = 5;
 }
 
 // Scene camera motion determined by the SceneCameraMotionAnalyzer class.
