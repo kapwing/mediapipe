@@ -93,3 +93,5 @@ RUN mkdir -p /mediapipe
 COPY --from=mediapipe /mediapipe/bazel-bin/mediapipe/examples/custom/object_box_tracking/object_box_tracking /mediapipe/
 COPY --from=mediapipe /mediapipe/mediapipe/models/ssdlite_object_detection.tflite /mediapipe/models/
 COPY --from=mediapipe /mediapipe/mediapipe/models/ssdlite_object_detection_labelmap.txt /mediapipe/models/
+COPY --from=mediapipe /mediapipe/bazel-bin/mediapipe/examples/custom/autoflip/run_custom_autoflip /mediapipe/
+COPY --from=mediapipe /mediapipe/mediapipe/modules/face_detection/face_detection_full_range_sparse.tflite /mediapipe/modules/face_detection/
