@@ -145,16 +145,16 @@ message SceneKeyFrameCropSummary {
 }
 
 message StaticSceneCropSummary {
-  // Scene frame size.
-  optional int32 width = 1;
-  optional int32 height = 2;
+  // Scene frame size (as a fraction of the target dimensions).
+  optional float width = 1;
+  optional float height = 2;
 
   // Scene length.
   optional int32 num_frames = 3;
 
-  // Static scene position.
-  optional int32 x = 4;
-  optional int32 y = 5;
+  // Static scene position (as a fraction of the target dimensions).
+  optional float x = 4;
+  optional float y = 5;
 }
 
 // Scene camera motion determined by the SceneCameraMotionAnalyzer class.

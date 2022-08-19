@@ -568,11 +568,11 @@ absl::Status SceneCroppingCoordinatesCalculator::ProcessScene(const bool is_end_
     height = expected_height;
   }
 
-  new_static_scene_crop_summary->set_width(width);
-  new_static_scene_crop_summary->set_height(height);
+  new_static_scene_crop_summary->set_width(static_cast<float>(width) / frame_width_);
+  new_static_scene_crop_summary->set_height(static_cast<float>(height) / frame_height_);
   new_static_scene_crop_summary->set_num_frames(cur_scene_frames_);
-  new_static_scene_crop_summary->set_x(x);
-  new_static_scene_crop_summary->set_y(y);
+  new_static_scene_crop_summary->set_x(static_cast<float>(x) / frame_width_);
+  new_static_scene_crop_summary->set_y(static_cast<float>(y) / frame_height_);
 
   cc->Outputs().Tag(kOutputCropBoundaries)
       .Add(new_static_scene_crop_summary.release(),
