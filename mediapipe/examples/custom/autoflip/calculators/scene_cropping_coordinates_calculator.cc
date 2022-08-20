@@ -555,16 +555,10 @@ absl::Status SceneCroppingCoordinatesCalculator::ProcessScene(const bool is_end_
   int expected_height = width / target_aspect_ratio_;
 
   if (width < expected_width) {
-    if (x == 0) {
-      x = width - expected_width;
-    }
-
+    x -= (expected_width - width) / 2;
     width = expected_width;
   } else if (height < expected_height) {
-    if (y == 0) {
-      y = height - expected_height;
-    }
-
+    y -= (expected_height - height) / 2;
     height = expected_height;
   }
 
