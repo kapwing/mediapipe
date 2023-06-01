@@ -22,6 +22,7 @@
 #include "mediapipe/framework/calculator_framework.h"
 #include "mediapipe/framework/formats/detection.pb.h"
 #include "mediapipe/framework/formats/location.h"
+#include "mediapipe/framework/formats/location_opencv.h"
 #include "mediapipe/framework/port/canonical_errors.h"
 #include "mediapipe/framework/port/opencv_imgcodecs_inc.h"
 #include "mediapipe/framework/port/ret_check.h"
@@ -37,6 +38,7 @@ const char kSequenceExampleTag[] = "SEQUENCE_EXAMPLE";
 const char kImageTag[] = "IMAGE";
 const char kFloatContextFeaturePrefixTag[] = "FLOAT_CONTEXT_FEATURE_";
 const char kFloatFeaturePrefixTag[] = "FLOAT_FEATURE_";
+const char kIntFeaturePrefixTag[] = "INT_FEATURE_";
 const char kBytesFeaturePrefixTag[] = "BYTES_FEATURE_";
 const char kForwardFlowEncodedTag[] = "FORWARD_FLOW_ENCODED";
 const char kBBoxTag[] = "BBOX";
@@ -87,9 +89,9 @@ namespace mpms = mediapipe::mediasequence;
 //   }
 // }
 namespace {
-uint8 ConvertFloatToByte(const float float_value) {
-  float clamped_value = MathUtil::Clamp(0.0f, 1.0f, float_value);
-  return static_cast<uint8>(clamped_value * 255.0 + .5f);
+uint8_t ConvertFloatToByte(const float float_value) {
+  float clamped_value = std::clamp(0.0f, 1.0f, float_value);
+  return static_cast<uint8_t>(clamped_value * 255.0 + .5f);
 }
 }  // namespace
 
@@ -153,6 +155,9 @@ class PackMediaSequenceCalculator : public CalculatorBase {
       }
       if (absl::StartsWith(tag, kFloatFeaturePrefixTag)) {
         cc->Inputs().Tag(tag).Set<std::vector<float>>();
+      }
+      if (absl::StartsWith(tag, kIntFeaturePrefixTag)) {
+        cc->Inputs().Tag(tag).Set<std::vector<int64_t>>();
       }
       if (absl::StartsWith(tag, kBytesFeaturePrefixTag)) {
         cc->Inputs().Tag(tag).Set<std::vector<std::string>>();
@@ -235,6 +240,12 @@ class PackMediaSequenceCalculator : public CalculatorBase {
           mpms::ClearFeatureFloats(key, sequence_.get());
           mpms::ClearFeatureTimestamp(key, sequence_.get());
         }
+        if (absl::StartsWith(tag, kIntFeaturePrefixTag)) {
+          std::string key = tag.substr(
+              sizeof(kIntFeaturePrefixTag) / sizeof(*kIntFeaturePrefixTag) - 1);
+          mpms::ClearFeatureInts(key, sequence_.get());
+          mpms::ClearFeatureTimestamp(key, sequence_.get());
+        }
         if (absl::StartsWith(tag, kBytesFeaturePrefixTag)) {
           std::string key = tag.substr(sizeof(kBytesFeaturePrefixTag) /
                                            sizeof(*kBytesFeaturePrefixTag) -
@@ -274,7 +285,7 @@ class PackMediaSequenceCalculator : public CalculatorBase {
   }
 
   absl::Status VerifySize() {
-    const int64 MAX_PROTO_BYTES = 1073741823;
+    const int64_t MAX_PROTO_BYTES = 1073741823;
     std::string id = mpms::HasExampleId(*sequence_)
                          ? mpms::GetExampleId(*sequence_)
                          : "example";
@@ -416,6 +427,16 @@ class PackMediaSequenceCalculator : public CalculatorBase {
                                cc->Inputs().Tag(tag).Get<std::vector<float>>(),
                                sequence_.get());
       }
+      if (absl::StartsWith(tag, kIntFeaturePrefixTag) &&
+          !cc->Inputs().Tag(tag).IsEmpty()) {
+        std::string key = tag.substr(
+            sizeof(kIntFeaturePrefixTag) / sizeof(*kIntFeaturePrefixTag) - 1);
+        mpms::AddFeatureTimestamp(key, cc->InputTimestamp().Value(),
+                                  sequence_.get());
+        mpms::AddFeatureInts(key,
+                             cc->Inputs().Tag(tag).Get<std::vector<int64_t>>(),
+                             sequence_.get());
+      }
       if (absl::StartsWith(tag, kBytesFeaturePrefixTag) &&
           !cc->Inputs().Tag(tag).IsEmpty()) {
         std::string key = tag.substr(sizeof(kBytesFeaturePrefixTag) /
@@ -508,7 +529,7 @@ class PackMediaSequenceCalculator : public CalculatorBase {
           RET_CHECK(!already_has_mask)
               << "We currently only support adding one mask per timestamp. "
               << sequence_->DebugString();
-          auto mask_mat_ptr = Location(detection.location_data()).GetCvMask();
+          auto mask_mat_ptr = GetCvMask(Location(detection.location_data()));
           std::vector<uchar> bytes;
           RET_CHECK(cv::imencode(".png", *mask_mat_ptr, bytes, {}));
 

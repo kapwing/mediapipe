@@ -48,47 +48,78 @@ class OpenCvProcessor : public ImageToTensorConverter {
     switch (tensor_type_) {
       case Tensor::ElementType::kInt8:
         mat_type_ = CV_8SC3;
+        mat_gray_type_ = CV_8SC1;
         break;
       case Tensor::ElementType::kFloat32:
         mat_type_ = CV_32FC3;
+        mat_gray_type_ = CV_32FC1;
         break;
       case Tensor::ElementType::kUInt8:
         mat_type_ = CV_8UC3;
+        mat_gray_type_ = CV_8UC1;
         break;
       default:
         mat_type_ = -1;
+        mat_gray_type_ = -1;
     }
   }
 
-  absl::StatusOr<Tensor> Convert(const mediapipe::Image& input,
-                                 const RotatedRect& roi,
-                                 const Size& output_dims, float range_min,
-                                 float range_max) override {
-    if (input.image_format() != mediapipe::ImageFormat::SRGB &&
-        input.image_format() != mediapipe::ImageFormat::SRGBA) {
-      return InvalidArgumentError(
-          absl::StrCat("Only RGBA/RGB formats are supported, passed format: ",
-                       static_cast<uint32_t>(input.image_format())));
+  absl::Status Convert(const mediapipe::Image& input, const RotatedRect& roi,
+                       float range_min, float range_max,
+                       int tensor_buffer_offset,
+                       Tensor& output_tensor) override {
+    const bool is_supported_format =
+        input.image_format() == mediapipe::ImageFormat::SRGB ||
+        input.image_format() == mediapipe::ImageFormat::SRGBA ||
+        input.image_format() == mediapipe::ImageFormat::GRAY8;
+    if (!is_supported_format) {
+      return InvalidArgumentError(absl::StrCat(
+          "Unsupported format: ", static_cast<uint32_t>(input.image_format())));
     }
-    auto src = mediapipe::formats::MatView(&input);
 
-    constexpr int kNumChannels = 3;
-    Tensor tensor(tensor_type_, Tensor::Shape{1, output_dims.height,
-                                              output_dims.width, kNumChannels});
-    auto buffer_view = tensor.GetCpuWriteView();
+    RET_CHECK_GE(tensor_buffer_offset, 0)
+        << "The input tensor_buffer_offset needs to be non-negative.";
+    const auto& output_shape = output_tensor.shape();
+    MP_RETURN_IF_ERROR(ValidateTensorShape(output_shape));
+
+    const int output_height = output_shape.dims[1];
+    const int output_width = output_shape.dims[2];
+    const int output_channels = output_shape.dims[3];
+    const int num_elements_per_img =
+        output_height * output_width * output_channels;
+    auto buffer_view = output_tensor.GetCpuWriteView();
     cv::Mat dst;
+    const int dst_data_type = output_channels == 1 ? mat_gray_type_ : mat_type_;
     switch (tensor_type_) {
       case Tensor::ElementType::kInt8:
-        dst = cv::Mat(output_dims.height, output_dims.width, mat_type_,
-                      buffer_view.buffer<int8>());
+        RET_CHECK_GE(
+            output_shape.num_elements(),
+            tensor_buffer_offset / sizeof(int8_t) + num_elements_per_img)
+            << "The buffer offset + the input image size is larger than the "
+               "allocated tensor buffer.";
+        dst = cv::Mat(output_height, output_width, dst_data_type,
+                      buffer_view.buffer<int8_t>() +
+                          tensor_buffer_offset / sizeof(int8_t));
         break;
       case Tensor::ElementType::kFloat32:
-        dst = cv::Mat(output_dims.height, output_dims.width, mat_type_,
-                      buffer_view.buffer<float>());
+        RET_CHECK_GE(
+            output_shape.num_elements(),
+            tensor_buffer_offset / sizeof(float) + num_elements_per_img)
+            << "The buffer offset + the input image size is larger than the "
+               "allocated tensor buffer.";
+        dst = cv::Mat(
+            output_height, output_width, dst_data_type,
+            buffer_view.buffer<float>() + tensor_buffer_offset / sizeof(float));
         break;
       case Tensor::ElementType::kUInt8:
-        dst = cv::Mat(output_dims.height, output_dims.width, mat_type_,
-                      buffer_view.buffer<uint8>());
+        RET_CHECK_GE(
+            output_shape.num_elements(),
+            tensor_buffer_offset / sizeof(uint8_t) + num_elements_per_img)
+            << "The buffer offset + the input image size is larger than the "
+               "allocated tensor buffer.";
+        dst = cv::Mat(output_height, output_width, dst_data_type,
+                      buffer_view.buffer<uint8_t>() +
+                          tensor_buffer_offset / sizeof(uint8_t));
         break;
       default:
         return InvalidArgumentError(
@@ -101,8 +132,8 @@ class OpenCvProcessor : public ImageToTensorConverter {
     cv::Mat src_points;
     cv::boxPoints(rotated_rect, src_points);
 
-    const float dst_width = output_dims.width;
-    const float dst_height = output_dims.height;
+    const float dst_width = output_width;
+    const float dst_height = output_height;
     /* clang-format off */
     float dst_corners[8] = {0.0f,      dst_height,
                             0.0f,      0.0f,
@@ -110,6 +141,7 @@ class OpenCvProcessor : public ImageToTensorConverter {
                             dst_width, dst_height};
     /* clang-format on */
 
+    auto src = mediapipe::formats::MatView(&input);
     cv::Mat dst_points = cv::Mat(4, 2, CV_32F, dst_corners);
     cv::Mat projection_matrix =
         cv::getPerspectiveTransform(src_points, dst_points);
@@ -119,7 +151,7 @@ class OpenCvProcessor : public ImageToTensorConverter {
                         /*flags=*/cv::INTER_LINEAR,
                         /*borderMode=*/border_mode_);
 
-    if (transformed.channels() > kNumChannels) {
+    if (transformed.channels() > output_channels) {
       cv::Mat proper_channels_mat;
       cv::cvtColor(transformed, proper_channels_mat, cv::COLOR_RGBA2RGB);
       transformed = proper_channels_mat;
@@ -131,14 +163,26 @@ class OpenCvProcessor : public ImageToTensorConverter {
         auto transform,
         GetValueRangeTransformation(kInputImageRangeMin, kInputImageRangeMax,
                                     range_min, range_max));
-    transformed.convertTo(dst, mat_type_, transform.scale, transform.offset);
-    return tensor;
+    transformed.convertTo(dst, dst_data_type, transform.scale,
+                          transform.offset);
+    return absl::OkStatus();
   }
 
  private:
+  absl::Status ValidateTensorShape(const Tensor::Shape& output_shape) {
+    RET_CHECK_EQ(output_shape.dims.size(), 4)
+        << "Wrong output dims size: " << output_shape.dims.size();
+    RET_CHECK_GE(output_shape.dims[0], 1)
+        << "The batch dimension needs to be equal or larger than 1.";
+    RET_CHECK(output_shape.dims[3] == 3 || output_shape.dims[3] == 1)
+        << "Wrong output channel: " << output_shape.dims[3];
+    return absl::OkStatus();
+  }
+
   enum cv::BorderTypes border_mode_;
   Tensor::ElementType tensor_type_;
   int mat_type_;
+  int mat_gray_type_;
 };
 
 }  // namespace

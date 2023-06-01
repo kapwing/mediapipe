@@ -62,11 +62,9 @@
 #include "mediapipe/framework/tool/validate.h"
 #include "mediapipe/framework/tool/validate_name.h"
 #include "mediapipe/framework/validated_graph_config.h"
+#include "mediapipe/gpu/gpu_service.h"
 #include "mediapipe/gpu/graph_support.h"
 #include "mediapipe/util/cpu_util.h"
-#if !MEDIAPIPE_DISABLE_GPU
-#include "mediapipe/gpu/gpu_shared_data_internal.h"
-#endif  // !MEDIAPIPE_DISABLE_GPU
 
 namespace mediapipe {
 
@@ -98,14 +96,13 @@ void CalculatorGraph::GraphInputStream::SetHeader(const Packet& header) {
   manager_->LockIntroData();
 }
 
+void CalculatorGraph::GraphInputStream::SetNextTimestampBound(
+    Timestamp timestamp) {
+  shard_.SetNextTimestampBound(timestamp);
+}
+
 void CalculatorGraph::GraphInputStream::PropagateUpdatesToMirrors() {
-  // Since GraphInputStream doesn't allow SetOffset() and
-  // SetNextTimestampBound(), the timestamp bound to propagate is only
-  // determined by the timestamp of the output packets.
-  CHECK(!shard_.IsEmpty()) << "Shard with name \"" << manager_->Name()
-                           << "\" failed";
-  manager_->PropagateUpdatesToMirrors(
-      shard_.LastAddedPacketTimestamp().NextAllowedInStream(), &shard_);
+  manager_->PropagateUpdatesToMirrors(shard_.NextTimestampBound(), &shard_);
 }
 
 void CalculatorGraph::GraphInputStream::Close() {
@@ -120,10 +117,10 @@ CalculatorGraph::CalculatorGraph()
   counter_factory_ = absl::make_unique<BasicCounterFactory>();
 }
 
-CalculatorGraph::CalculatorGraph(const CalculatorGraphConfig& config)
+CalculatorGraph::CalculatorGraph(CalculatorGraphConfig config)
     : CalculatorGraph() {
   counter_factory_ = absl::make_unique<BasicCounterFactory>();
-  MEDIAPIPE_CHECK_OK(Initialize(config));
+  MEDIAPIPE_CHECK_OK(Initialize(std::move(config)));
 }
 
 // Defining the destructor here lets us use incomplete types in the header;
@@ -195,8 +192,7 @@ absl::Status CalculatorGraph::InitializeStreams() {
       auto input_tag_map,
       tool::TagMap::Create(validated_graph_->Config().input_stream()));
   for (const auto& stream_name : input_tag_map->Names()) {
-    RET_CHECK(!mediapipe::ContainsKey(graph_input_streams_, stream_name))
-            .SetNoLogging()
+    RET_CHECK(!graph_input_streams_.contains(stream_name)).SetNoLogging()
         << "CalculatorGraph Initialization failed, graph input stream \""
         << stream_name << "\" was specified twice.";
     int output_stream_index = validated_graph_->OutputStreamIndex(stream_name);
@@ -429,18 +425,17 @@ absl::Status CalculatorGraph::Initialize(
   return absl::OkStatus();
 }
 
-absl::Status CalculatorGraph::Initialize(
-    const CalculatorGraphConfig& input_config) {
-  return Initialize(input_config, {});
+absl::Status CalculatorGraph::Initialize(CalculatorGraphConfig input_config) {
+  return Initialize(std::move(input_config), {});
 }
 
 absl::Status CalculatorGraph::Initialize(
-    const CalculatorGraphConfig& input_config,
+    CalculatorGraphConfig input_config,
     const std::map<std::string, Packet>& side_packets) {
   auto validated_graph = absl::make_unique<ValidatedGraphConfig>();
   MP_RETURN_IF_ERROR(validated_graph->Initialize(
-      input_config, /*graph_registry=*/nullptr, /*graph_options=*/nullptr,
-      &service_manager_));
+      std::move(input_config), /*graph_registry=*/nullptr,
+      /*graph_options=*/nullptr, &service_manager_));
   return Initialize(std::move(validated_graph), side_packets);
 }
 
@@ -635,7 +630,13 @@ absl::Status CalculatorGraph::PrepareServices() {
     for (const auto& [key, request] : node->Contract().ServiceRequests()) {
       auto packet = service_manager_.GetServicePacket(request.Service());
       if (!packet.IsEmpty()) continue;
-      auto packet_or = request.Service().CreateDefaultObject();
+      absl::StatusOr<Packet> packet_or;
+      if (allow_service_default_initialization_) {
+        packet_or = request.Service().CreateDefaultObject();
+      } else {
+        packet_or = absl::FailedPreconditionError(
+            "Service default initialization is disallowed.");
+      }
       if (packet_or.ok()) {
         MP_RETURN_IF_ERROR(service_manager_.SetServicePacket(
             request.Service(), std::move(packet_or).value()));
@@ -675,6 +676,7 @@ absl::Status CalculatorGraph::PrepareForRun(
 #endif  // !MEDIAPIPE_DISABLE_GPU
   MP_RETURN_IF_ERROR(PrepareServices());
 #if !MEDIAPIPE_DISABLE_GPU
+  // TODO: should we do this on each run, or only once?
   MP_RETURN_IF_ERROR(PrepareGpu());
   additional_side_packets = MaybeCreateLegacyGpuSidePacket(legacy_sp);
 #endif  // !MEDIAPIPE_DISABLE_GPU
@@ -866,6 +868,19 @@ absl::Status CalculatorGraph::AddPacketToInputStream(
 absl::Status CalculatorGraph::AddPacketToInputStream(
     const std::string& stream_name, Packet&& packet) {
   return AddPacketToInputStreamInternal(stream_name, std::move(packet));
+}
+
+absl::Status CalculatorGraph::SetInputStreamTimestampBound(
+    const std::string& stream_name, Timestamp timestamp) {
+  std::unique_ptr<GraphInputStream>* stream =
+      mediapipe::FindOrNull(graph_input_streams_, stream_name);
+  RET_CHECK(stream).SetNoLogging() << absl::Substitute(
+      "SetInputStreamTimestampBound called on input stream \"$0\" which is not "
+      "a graph input stream.",
+      stream_name);
+  (*stream)->SetNextTimestampBound(timestamp);
+  (*stream)->PropagateUpdatesToMirrors();
+  return absl::OkStatus();
 }
 
 // We avoid having two copies of this code for AddPacketToInputStream(
@@ -1216,7 +1231,7 @@ bool CalculatorGraph::UnthrottleSources() {
           "Detected a deadlock due to input throttling for: \"", stream->Name(),
           "\". All calculators are idle while packet sources remain active "
           "and throttled.  Consider adjusting \"max_queue_size\" or "
-          "\"resolve_deadlock\".")));
+          "\"report_deadlock\".")));
       continue;
     }
     int new_size = stream->QueueSize() + 1;
@@ -1251,7 +1266,9 @@ void CalculatorGraph::Resume() { scheduler_.Resume(); }
 
 absl::Status CalculatorGraph::SetExecutorInternal(
     const std::string& name, std::shared_ptr<Executor> executor) {
-  if (!executors_.emplace(name, executor).second) {
+  auto [it, inserted] = executors_.emplace(name, executor);
+  if (!inserted) {
+    if (it->second == executor) return absl::OkStatus();
     return mediapipe::AlreadyExistsErrorBuilder(MEDIAPIPE_LOC)
            << "SetExecutor must be called only once for the executor \"" << name
            << "\"";
@@ -1352,23 +1369,23 @@ const OutputStreamManager* CalculatorGraph::FindOutputStreamManager(
 }
 
 namespace {
-void PrintTimingToInfo(const std::string& label, int64 timer_value) {
-  const int64 total_seconds = timer_value / 1000000ll;
-  const int64 days = total_seconds / (3600ll * 24ll);
-  const int64 hours = (total_seconds / 3600ll) % 24ll;
-  const int64 minutes = (total_seconds / 60ll) % 60ll;
-  const int64 seconds = total_seconds % 60ll;
-  const int64 milliseconds = (timer_value / 1000ll) % 1000ll;
+void PrintTimingToInfo(const std::string& label, int64_t timer_value) {
+  const int64_t total_seconds = timer_value / 1000000ll;
+  const int64_t days = total_seconds / (3600ll * 24ll);
+  const int64_t hours = (total_seconds / 3600ll) % 24ll;
+  const int64_t minutes = (total_seconds / 60ll) % 60ll;
+  const int64_t seconds = total_seconds % 60ll;
+  const int64_t milliseconds = (timer_value / 1000ll) % 1000ll;
   LOG(INFO) << label << " took "
             << absl::StrFormat(
                    "%02lld days, %02lld:%02lld:%02lld.%03lld (total seconds: "
                    "%lld.%06lld)",
                    days, hours, minutes, seconds, milliseconds, total_seconds,
-                   timer_value % int64{1000000});
+                   timer_value % int64_t{1000000});
 }
 
-bool MetricElementComparator(const std::pair<std::string, int64>& e1,
-                             const std::pair<std::string, int64>& e2) {
+bool MetricElementComparator(const std::pair<std::string, int64_t>& e1,
+                             const std::pair<std::string, int64_t>& e2) {
   return e1.second > e2.second;
 }
 }  // namespace

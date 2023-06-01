@@ -59,7 +59,7 @@ class CalculatorContract {
   const CalculatorOptions& Options() const { return node_config_->options(); }
 
   // Returns the name given to this node.
-  const std::string& GetNodeName() { return node_name_; }
+  const std::string& GetNodeName() const { return node_name_; }
 
   // Returns the options given to this calculator.  Template argument T must
   // be the type of the protobuf extension message or the protobuf::Any
@@ -67,6 +67,11 @@ class CalculatorContract {
   template <class T>
   const T& Options() const {
     return options_.Get<T>();
+  }
+
+  template <class T>
+  bool HasOptions() const {
+    return options_.Has<T>();
   }
 
   // Returns the PacketTypeSet for the input streams.
@@ -136,6 +141,12 @@ class CalculatorContract {
   class GraphServiceRequest {
    public:
     // APIs that should be used by calculators.
+    //
+    // Indicates that requested service is optional and calculator can operate
+    // correctly without it.
+    //
+    // NOTE: `CalculatorGraph` will still try to create services which allow
+    // default initialization. (See `CalculatorGraph::UseService`)
     GraphServiceRequest& Optional() {
       optional_ = true;
       return *this;
@@ -153,6 +164,17 @@ class CalculatorContract {
     bool optional_ = false;
   };
 
+  // Indicates specific `service` is required for graph execution.
+  //
+  // For services which allow default initialization:
+  // - `CalculatorGraph` will try to create corresponding service object by
+  //   default even if request is made optional
+  //   (`GraphServiceRequest::Optional()`)
+  //
+  // For services which disallow default initialization:
+  // - `CalculatorGraph` requires client to set corresponding service object and
+  //   otherwise fails, unles request is mad optional
+  //   (`GraphServiceRequest::Optional()`)
   GraphServiceRequest& UseService(const GraphServiceBase& service) {
     auto it = service_requests_.emplace(service.key, service).first;
     return it->second;

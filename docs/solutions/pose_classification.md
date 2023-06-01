@@ -1,8 +1,9 @@
 ---
-layout: default
+layout: forward
+target: https://developers.google.com/mediapipe/solutions/vision/pose_landmarker/
 title: Pose Classification
 parent: Pose
-grand_parent: Solutions
+grand_parent: MediaPipe Legacy Solutions
 nav_order: 1
 ---
 
@@ -19,6 +20,14 @@ nav_order: 1
 </details>
 ---
 
+**Attention:** *Thank you for your interest in MediaPipe Solutions.
+As of March 1, 2023, this solution is planned to be upgraded to a new MediaPipe
+Solution. For more information, see the
+[MediaPipe Solutions](https://developers.google.com/mediapipe/solutions/vision/pose_landmarker/)
+site.*
+
+----
+
 ## Overview
 
 One of the applications
@@ -31,7 +40,7 @@ demo within
 Push-ups and squats are used for demonstration purposes as the most common
 exercises.
 
-![pose_classification_pushups_and_squats.gif](../images/mobile/pose_classification_pushups_and_squats.gif) |
+![pose_classification_pushups_and_squats.gif](https://mediapipe.dev/images/mobile/pose_classification_pushups_and_squats.gif) |
 :--------------------------------------------------------------------------------------------------------: |
 *Fig 1. Pose classification and repetition counting with MediaPipe Pose.*                                  |
 
@@ -58,7 +67,7 @@ exercise (e.g., "up" and "down" positions for push-ups). It's important that
 collected samples cover different camera angles, environment conditions, body
 shapes, and exercise variations.
 
-![pose_classification_pushups_un_and_down_samples.jpg](../images/mobile/pose_classification_pushups_un_and_down_samples.jpg) |
+![pose_classification_pushups_un_and_down_samples.jpg](https://mediapipe.dev/images/mobile/pose_classification_pushups_un_and_down_samples.jpg) |
 :--------------------------------------------------------------------------------------------------------------------------: |
 *Fig 2. Two terminal states of push-ups.*                                                                                    |
 
@@ -90,7 +99,7 @@ ankle and hip, and two wrists. Since the algorithm relies on distances, all
 poses are normalized to have the same torso size and vertical torso orientation
 before the conversion.
 
-![pose_classification_pairwise_distances.png](../images/mobile/pose_classification_pairwise_distances.png) |
+![pose_classification_pairwise_distances.png](https://mediapipe.dev/images/mobile/pose_classification_pairwise_distances.png) |
 :--------------------------------------------------------------------------------------------------------: |
 *Fig 3. Main pairwise distances used for the pose feature vector.*                                         |
 

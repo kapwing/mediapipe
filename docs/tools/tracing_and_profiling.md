@@ -1,5 +1,6 @@
 ---
-layout: default
+layout: forward
+target: https://developers.google.com/mediapipe/
 title: Tracing and Profiling
 parent: Tools
 nav_order: 2
@@ -11,6 +12,12 @@ nav_order: 2
 1. TOC
 {:toc}
 ---
+
+**Attention:** *Thanks for your interest in MediaPipe! We have moved to
+[https://developers.google.com/mediapipe](https://developers.google.com/mediapipe)
+as the primary developer documentation site for MediaPipe as of April 3, 2023.*
+
+----
 
 The MediaPipe framework includes a built-in tracer and profiler. The tracer
 records various timing events related to packet processing, including the start
@@ -70,7 +77,7 @@ MediaPipe will emit data into a pre-specified directory:
 *   On iOS, this can be reached through XCode. Select "Window/Devices and
     Simulators" and select the "Devices" tab.
 
-    ![Windows Select Devices](../images/visualizer/ios_window_devices.png)
+    ![Windows Select Devices](https://mediapipe.dev/images/visualizer/ios_window_devices.png)
 
     You can open the Download Container. Logs will be located in `application
     container/.xcappdata/AppData/Documents/`
@@ -78,7 +85,7 @@ MediaPipe will emit data into a pre-specified directory:
     right click and select 'Show Package Contents' in Finder. Logs
     will be located in 'AppData/Documents/'
 
-    ![Windows Download Container](../images/visualizer/ios_download_container.png)
+    ![Windows Download Container](https://mediapipe.dev/images/visualizer/ios_download_container.png)
 
 Log files are written to `\<trace_log_path index\>.binarypb` where, by default,
 `\<trace_log_path\>` is equal to `mediapipe_trace_` (the entire path and file
@@ -176,11 +183,11 @@ Trace logs can be analyzed from within the visualizer.
 
 2.  Click on the "Upload" button in the upper right.
 
-    ![Click on Upload](../images/visualizer/viz_click_upload.png)
+    ![Click on Upload](https://mediapipe.dev/images/visualizer/viz_click_upload.png)
 
 3.  Click on "Upload trace file".
 
-    ![Click on Upload](../images/visualizer/viz_click_upload_trace_file.png)
+    ![Click on Upload](https://mediapipe.dev/images/visualizer/viz_click_upload_trace_file.png)
 
     A sample trace file has been generated for you:
     [sample_trace_binary.pb](../data/visualizer/sample_trace.binarypb)
@@ -191,7 +198,7 @@ Trace logs can be analyzed from within the visualizer.
 5.  A chart view will appear. All of your calculators will appear along the left
     with profiling information listed along the top.
 
-    ![Click on Upload](../images/visualizer/viz_chart_view.png)
+    ![Click on Upload](https://mediapipe.dev/images/visualizer/viz_chart_view.png)
 
     Click on a header to alternately sort that column in ascending or descending
     order. You can also scroll horizontally and vertically within the control to

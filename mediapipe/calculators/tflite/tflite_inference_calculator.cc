@@ -485,9 +485,9 @@ absl::Status TfLiteInferenceCalculator::WriteKernelsToFile() {
 #if MEDIAPIPE_TFLITE_GL_INFERENCE && defined(MEDIAPIPE_ANDROID)
   if (use_kernel_caching_) {
     // Save kernel file.
-    auto kernel_cache = absl::make_unique<std::vector<uint8_t>>(
-        tflite_gpu_runner_->GetSerializedBinaryCache());
-    std::string cache_str(kernel_cache->begin(), kernel_cache->end());
+    ASSIGN_OR_RETURN(std::vector<uint8_t> kernel_cache,
+                     tflite_gpu_runner_->GetSerializedBinaryCache());
+    std::string cache_str(kernel_cache.begin(), kernel_cache.end());
     MP_RETURN_IF_ERROR(
         mediapipe::file::SetContents(cached_kernel_filename_, cache_str));
   }
@@ -535,8 +535,9 @@ absl::Status TfLiteInferenceCalculator::ProcessInputsCpu(
     const TfLiteTensor* input_tensor = &input_tensors[i];
     RET_CHECK(input_tensor->data.raw);
     if (use_quantized_tensors_) {
-      const uint8* input_tensor_buffer = input_tensor->data.uint8;
-      uint8* local_tensor_buffer = interpreter_->typed_input_tensor<uint8>(i);
+      const uint8_t* input_tensor_buffer = input_tensor->data.uint8;
+      uint8_t* local_tensor_buffer =
+          interpreter_->typed_input_tensor<uint8_t>(i);
       std::memcpy(local_tensor_buffer, input_tensor_buffer,
                   input_tensor->bytes);
     } else {

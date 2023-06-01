@@ -20,18 +20,13 @@
 #include <string>
 #include <vector>
 
-#include "absl/memory/memory.h"
 #include "mediapipe/calculators/tensor/inference_calculator.pb.h"
 #include "mediapipe/framework/api2/node.h"
 #include "mediapipe/framework/calculator_framework.h"
 #include "mediapipe/framework/formats/tensor.h"
-#include "mediapipe/framework/port/ret_check.h"
 #include "mediapipe/util/tflite/tflite_model_loader.h"
 #include "tensorflow/lite/core/api/op_resolver.h"
-#include "tensorflow/lite/error_reporter.h"
-#include "tensorflow/lite/interpreter.h"
 #include "tensorflow/lite/kernels/register.h"
-#include "tensorflow/lite/model.h"
 
 namespace mediapipe {
 namespace api2 {
@@ -117,12 +112,13 @@ class InferenceCalculator : public NodeIntf {
 
  protected:
   using TfLiteDelegatePtr =
-      std::unique_ptr<TfLiteDelegate, std::function<void(TfLiteDelegate*)>>;
+      std::unique_ptr<TfLiteOpaqueDelegate,
+                      std::function<void(TfLiteOpaqueDelegate*)>>;
 
-  absl::StatusOr<Packet<TfLiteModelPtr>> GetModelAsPacket(
+  static absl::StatusOr<Packet<TfLiteModelPtr>> GetModelAsPacket(
       CalculatorContext* cc);
 
-  absl::StatusOr<Packet<tflite::OpResolver>> GetOpResolverAsPacket(
+  static absl::StatusOr<Packet<tflite::OpResolver>> GetOpResolverAsPacket(
       CalculatorContext* cc);
 };
 
@@ -134,12 +130,20 @@ struct InferenceCalculatorGl : public InferenceCalculator {
   static constexpr char kCalculatorName[] = "InferenceCalculatorGl";
 };
 
+struct InferenceCalculatorGlAdvanced : public InferenceCalculator {
+  static constexpr char kCalculatorName[] = "InferenceCalculatorGlAdvanced";
+};
+
 struct InferenceCalculatorMetal : public InferenceCalculator {
   static constexpr char kCalculatorName[] = "InferenceCalculatorMetal";
 };
 
 struct InferenceCalculatorCpu : public InferenceCalculator {
   static constexpr char kCalculatorName[] = "InferenceCalculatorCpu";
+};
+
+struct InferenceCalculatorXnnpack : public InferenceCalculator {
+  static constexpr char kCalculatorName[] = "InferenceCalculatorXnnpack";
 };
 
 }  // namespace api2

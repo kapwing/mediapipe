@@ -1,7 +1,8 @@
 ---
-layout: default
+layout: forward
+target: https://developers.google.com/mediapipe/solutions/vision/image_segmenter/
 title: Hair Segmentation
-parent: Solutions
+parent: MediaPipe Legacy Solutions
 nav_order: 8
 ---
 
@@ -18,7 +19,15 @@ nav_order: 8
 </details>
 ---
 
-![hair_segmentation_android_gpu_gif](../images/mobile/hair_segmentation_android_gpu.gif)
+**Attention:** *Thank you for your interest in MediaPipe Solutions.
+As of April 4, 2023, this solution was upgraded to a new MediaPipe
+Solution. For more information, see the
+[MediaPipe Solutions](https://developers.google.com/mediapipe/solutions/vision/image_segmenter/)
+site.*
+
+----
+
+![hair_segmentation_android_gpu_gif](https://mediapipe.dev/images/mobile/hair_segmentation_android_gpu.gif)
 
 ## Example Apps
 
@@ -58,7 +67,7 @@ processed all locally in real-time and never leaves your device. Please see
 [MediaPipe on the Web](https://developers.googleblog.com/2020/01/mediapipe-on-web.html)
 in Google Developers Blog for details.
 
-![visualizer_runner](../images/visualizer_runner.png)
+![visualizer_runner](https://mediapipe.dev/images/visualizer_runner.png)
 
 ## Resources
 

@@ -195,7 +195,7 @@ class ValidatedGraphConfig {
   // before any other functions.  Subgraphs are specified through the
   // global graph registry or an optional local graph registry.
   absl::Status Initialize(
-      const CalculatorGraphConfig& input_config,
+      CalculatorGraphConfig input_config,
       const GraphRegistry* graph_registry = nullptr,
       const Subgraph::SubgraphOptions* graph_options = nullptr,
       const GraphServiceManager* service_manager = nullptr);
@@ -282,6 +282,14 @@ class ValidatedGraphConfig {
     return output_streams_[iter->second].parent_node.index;
   }
 
+  std::vector<int> OutputStreamToConsumers(int idx) const {
+    auto iter = output_streams_to_consumer_nodes_.find(idx);
+    if (iter == output_streams_to_consumer_nodes_.end()) {
+      return {};
+    }
+    return iter->second;
+  }
+
   // Returns the registered type name of the specified side packet if
   // it can be determined, otherwise an appropriate error is returned.
   absl::StatusOr<std::string> RegisteredSidePacketTypeName(
@@ -302,6 +310,13 @@ class ValidatedGraphConfig {
   }
 
  private:
+  // Perform transforms such as converting legacy features, expanding
+  // subgraphs, and popluting input stream handler.
+  absl::Status PerformBasicTransforms(
+      const GraphRegistry* graph_registry,
+      const Subgraph::SubgraphOptions* graph_options,
+      const GraphServiceManager* service_manager);
+
   // Initialize the PacketGenerator information.
   absl::Status InitializeGeneratorInfo();
   // Initialize the Calculator information.
@@ -411,6 +426,10 @@ class ValidatedGraphConfig {
 
   // Mapping from stream name to the output_streams_ index which produces it.
   std::map<std::string, int> stream_to_producer_;
+
+  // Mapping from output streams to consumer node ids. Used for profiling.
+  std::map<int, std::vector<int>> output_streams_to_consumer_nodes_;
+
   // Mapping from side packet name to the output_side_packets_ index
   // which produces it.
   std::map<std::string, int> side_packet_to_producer_;

@@ -15,8 +15,14 @@
 #include "mediapipe/gpu/gl_texture_buffer.h"
 
 #include "mediapipe/framework/formats/image_frame.h"
+#include "mediapipe/gpu/gl_context.h"
 #include "mediapipe/gpu/gl_texture_view.h"
 #include "mediapipe/gpu/gpu_buffer_storage_image_frame.h"
+
+#if MEDIAPIPE_GPU_BUFFER_USE_CV_PIXEL_BUFFER
+#include "mediapipe/gpu/gl_texture_util.h"
+#include "mediapipe/gpu/gpu_buffer_storage_cv_pixel_buffer.h"
+#endif  // MEDIAPIPE_GPU_BUFFER_USE_CV_PIXEL_BUFFER
 
 namespace mediapipe {
 
@@ -41,6 +47,7 @@ std::unique_ptr<GlTextureBuffer> GlTextureBuffer::Create(int width, int height,
   auto buf = absl::make_unique<GlTextureBuffer>(GL_TEXTURE_2D, 0, width, height,
                                                 format, nullptr);
   if (!buf->CreateInternal(data, alignment)) {
+    LOG(WARNING) << "Failed to create a GL texture";
     return nullptr;
   }
   return buf;
@@ -58,7 +65,7 @@ std::unique_ptr<GlTextureBuffer> GlTextureBuffer::Create(
   int actual_ws = image_frame.WidthStep();
   int alignment = 0;
   std::unique_ptr<ImageFrame> temp;
-  const uint8* data = image_frame.PixelData();
+  const uint8_t* data = image_frame.PixelData();
 
   // Let's see if the pixel data is tightly aligned to one of the alignments
   // supported by OpenGL, preferring 4 if possible since it's the default.
@@ -100,7 +107,10 @@ GlTextureBuffer::GlTextureBuffer(GLenum target, GLuint name, int width,
 
 bool GlTextureBuffer::CreateInternal(const void* data, int alignment) {
   auto context = GlContext::GetCurrent();
-  if (!context) return false;
+  if (!context) {
+    LOG(WARNING) << "Cannot create a GL texture without a valid context";
+    return false;
+  }
 
   producer_context_ = context;  // Save creation GL context.
 
@@ -144,10 +154,23 @@ bool GlTextureBuffer::CreateInternal(const void* data, int alignment) {
                         context](std::shared_ptr<GlSyncPoint> sync_token) {
     CHECK_NE(name_, 0);
     GLuint name_to_delete = name_;
-    context->RunWithoutWaiting([name_to_delete, sync_token]() {
-      // TODO: maybe we do not actually have to wait for the
-      // consumer sync here. Check docs.
-      sync_token->WaitOnGpu();
+    context->RunWithoutWaiting([name_to_delete]() {
+      // Note that we do not wait for consumers to be done before deleting the
+      // texture. Based on a reading of the GLES 3.0 spec, appendix D:
+      // - when a texture is deleted, it is _not_ automatically unbound from
+      //   bind points in other contexts;
+      // - when a texture is deleted, its name becomes immediately invalid, but
+      //   the actual object is not deleted until it is no longer in use, i.e.
+      //   attached to a container object or bound to a context;
+      // - deleting an object is not an operation that changes its contents;
+      // - within each context, commands are executed sequentially, so it seems
+      //   like an unbind that follows a command that reads a texture should not
+      //   take effect until the GPU has actually finished executing the
+      //   previous commands.
+      // The final point is the least explicit in the docs, but it is implied by
+      // normal single-context behavior. E.g. if you do bind, delete, render,
+      // unbind, the object is not deleted until the unbind, and it waits for
+      // the render to finish.
       DLOG_IF(ERROR, !glIsTexture(name_to_delete))
           << "Deleting invalid texture id: " << name_to_delete;
       glDeleteTextures(1, &name_to_delete);
@@ -179,13 +202,22 @@ void GlTextureBuffer::Reuse() {
 void GlTextureBuffer::Updated(std::shared_ptr<GlSyncPoint> prod_token) {
   CHECK(!producer_sync_)
       << "Updated existing texture which had not been marked for reuse!";
+  CHECK(prod_token);
   producer_sync_ = std::move(prod_token);
-  producer_context_ = producer_sync_->GetContext();
+  const auto& synced_context = producer_sync_->GetContext();
+  if (synced_context) {
+    producer_context_ = synced_context;
+  }
 }
 
 void GlTextureBuffer::DidRead(std::shared_ptr<GlSyncPoint> cons_token) const {
   absl::MutexLock lock(&consumer_sync_mutex_);
-  consumer_multi_sync_->Add(std::move(cons_token));
+  if (cons_token) {
+    consumer_multi_sync_->Add(std::move(cons_token));
+  } else {
+    // TODO: change to a CHECK.
+    LOG_FIRST_N(WARNING, 5) << "unexpected null sync in DidRead";
+  }
 }
 
 GlTextureBuffer::~GlTextureBuffer() {
@@ -228,39 +260,46 @@ void GlTextureBuffer::WaitForConsumersOnGpu() {
   // precisely, on only one GL context.
 }
 
-GlTextureView GlTextureBuffer::GetReadView(
-    internal::types<GlTextureView>, std::shared_ptr<GpuBuffer> gpu_buffer,
-    int plane) const {
+GlTextureView GlTextureBuffer::GetReadView(internal::types<GlTextureView>,
+                                           int plane) const {
   auto gl_context = GlContext::GetCurrent();
   CHECK(gl_context);
   CHECK_EQ(plane, 0);
+  // Note that this method is only supposed to be called by GpuBuffer, which
+  // ensures this condition is satisfied.
+  DCHECK(!weak_from_this().expired())
+      << "GlTextureBuffer must be held in shared_ptr to get a GlTextureView";
   // Insert wait call to sync with the producer.
   WaitOnGpu();
-  GlTextureView::DetachFn detach = [this](GlTextureView& texture) {
-    // Inform the GlTextureBuffer that we have finished accessing its
-    // contents, and create a consumer sync point.
-    DidRead(texture.gl_context()->CreateSyncToken());
-  };
+  GlTextureView::DetachFn detach =
+      [texbuf = shared_from_this()](GlTextureView& texture) {
+        // Inform the GlTextureBuffer that we have finished accessing its
+        // contents, and create a consumer sync point.
+        texbuf->DidRead(texture.gl_context()->CreateSyncToken());
+      };
   return GlTextureView(gl_context.get(), target(), name(), width(), height(),
-                       std::move(gpu_buffer), plane, std::move(detach),
-                       nullptr);
+                       plane, std::move(detach), nullptr);
 }
 
-GlTextureView GlTextureBuffer::GetWriteView(
-    internal::types<GlTextureView>, std::shared_ptr<GpuBuffer> gpu_buffer,
-    int plane) {
+GlTextureView GlTextureBuffer::GetWriteView(internal::types<GlTextureView>,
+                                            int plane) {
   auto gl_context = GlContext::GetCurrent();
   CHECK(gl_context);
   CHECK_EQ(plane, 0);
+  // Note that this method is only supposed to be called by GpuBuffer, which
+  // ensures this condition is satisfied.
+  DCHECK(!weak_from_this().expired())
+      << "GlTextureBuffer must be held in shared_ptr to get a GlTextureView";
   // Insert wait call to sync with the producer.
   WaitOnGpu();
   Reuse();  // TODO: the producer wait should probably be part of Reuse in the
             // case when there are no consumers.
   GlTextureView::DoneWritingFn done_writing =
-      [this](const GlTextureView& texture) { ViewDoneWriting(texture); };
+      [texbuf = shared_from_this()](const GlTextureView& texture) {
+        texbuf->ViewDoneWriting(texture);
+      };
   return GlTextureView(gl_context.get(), target(), name(), width(), height(),
-                       std::move(gpu_buffer), plane, nullptr,
-                       std::move(done_writing));
+                       plane, nullptr, std::move(done_writing));
 }
 
 void GlTextureBuffer::ViewDoneWriting(const GlTextureView& view) {
@@ -299,8 +338,8 @@ void GlTextureBuffer::ViewDoneWriting(const GlTextureView& view) {
 #endif  // __ANDROID__
 }
 
-static void ReadTexture(const GlTextureView& view, GpuBufferFormat format,
-                        void* output, size_t size) {
+static void ReadTexture(GlContext& ctx, const GlTextureView& view,
+                        GpuBufferFormat format, void* output, size_t size) {
   // TODO: check buffer size? We could use glReadnPixels where available
   // (OpenGL ES 3.2, i.e. nowhere). Note that, to fully check that the read
   // won't overflow the buffer with glReadPixels, we'd also need to check or
@@ -310,13 +349,7 @@ static void ReadTexture(const GlTextureView& view, GpuBufferFormat format,
   GlTextureInfo info = GlTextureInfoForGpuBufferFormat(
       format, view.plane(), view.gl_context()->GetGlVersion());
 
-  GLint previous_fbo;
-  glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previous_fbo);
-
-  // We use a temp fbo to avoid depending on the app having an existing one.
-  // TODO: keep a utility fbo around in the context?
-  GLuint fbo = 0;
-  glGenFramebuffers(1, &fbo);
+  GLuint fbo = kUtilityFramebuffer.Get(ctx);
   glBindFramebuffer(GL_FRAMEBUFFER, fbo);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, view.target(),
                          view.name(), 0);
@@ -324,9 +357,7 @@ static void ReadTexture(const GlTextureView& view, GpuBufferFormat format,
                output);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0,
                          0);
-  // TODO: just set the binding to 0 to avoid the get call?
-  glBindFramebuffer(GL_FRAMEBUFFER, previous_fbo);
-  glDeleteFramebuffers(1, &fbo);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 static std::shared_ptr<GpuBufferStorageImageFrame> ConvertToImageFrame(
@@ -336,9 +367,11 @@ static std::shared_ptr<GpuBufferStorageImageFrame> ConvertToImageFrame(
   auto output =
       absl::make_unique<ImageFrame>(image_format, buf->width(), buf->height(),
                                     ImageFrame::kGlDefaultAlignmentBoundary);
-  buf->GetProducerContext()->Run([buf, &output] {
-    auto view = buf->GetReadView(internal::types<GlTextureView>{}, nullptr, 0);
-    ReadTexture(view, buf->format(), output->MutablePixelData(),
+  auto ctx = GlContext::GetCurrent();
+  if (!ctx) ctx = buf->GetProducerContext();
+  ctx->Run([buf, &output, &ctx] {
+    auto view = buf->GetReadView(internal::types<GlTextureView>{}, /*plane=*/0);
+    ReadTexture(*ctx, view, buf->format(), output->MutablePixelData(),
                 output->PixelDataSize());
   });
   return std::make_shared<GpuBufferStorageImageFrame>(std::move(output));
@@ -357,5 +390,31 @@ static auto kConverterRegistration2 =
     internal::GpuBufferStorageRegistry::Get()
         .RegisterConverter<GpuBufferStorageImageFrame, GlTextureBuffer>(
             ConvertFromImageFrame);
+
+#if MEDIAPIPE_GPU_BUFFER_USE_CV_PIXEL_BUFFER
+
+static std::shared_ptr<GpuBufferStorageCvPixelBuffer> ConvertToCvPixelBuffer(
+    std::shared_ptr<GlTextureBuffer> buf) {
+  auto output = absl::make_unique<GpuBufferStorageCvPixelBuffer>(
+      buf->width(), buf->height(), buf->format());
+  auto ctx = GlContext::GetCurrent();
+  if (!ctx) ctx = buf->GetProducerContext();
+  ctx->Run([buf, &output] {
+    TempGlFramebuffer framebuffer;
+    auto src = buf->GetReadView(internal::types<GlTextureView>{}, /*plane=*/0);
+    auto dst =
+        output->GetWriteView(internal::types<GlTextureView>{}, /*plane=*/0);
+    CopyGlTexture(src, dst);
+    glFlush();
+  });
+  return output;
+}
+
+static auto kConverterRegistrationCvpb =
+    internal::GpuBufferStorageRegistry::Get()
+        .RegisterConverter<GlTextureBuffer, GpuBufferStorageCvPixelBuffer>(
+            ConvertToCvPixelBuffer);
+
+#endif  // MEDIAPIPE_GPU_BUFFER_USE_CV_PIXEL_BUFFER
 
 }  // namespace mediapipe

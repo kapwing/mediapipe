@@ -30,11 +30,13 @@
 
 namespace mediapipe {
 
+using ::testing::status::StatusIs;
 namespace {
 
 namespace tf = ::tensorflow;
 
 constexpr char kStringSavedModelPathTag[] = "STRING_SAVED_MODEL_PATH";
+constexpr char kStringSignatureNameTag[] = "STRING_SIGNATURE_NAME";
 constexpr char kSessionTag[] = "SESSION";
 
 std::string GetSavedModelDir() {
@@ -48,7 +50,7 @@ std::string GetSavedModelDir() {
 tf::Tensor TensorMatrix1x3(const int v1, const int v2, const int v3) {
   tf::Tensor tensor(tf::DT_INT32,
                     tf::TensorShape(std::vector<tf::int64>({1, 3})));
-  auto matrix = tensor.matrix<int32>();
+  auto matrix = tensor.matrix<int32_t>();
   matrix(0, 0) = v1;
   matrix(0, 1) = v2;
   matrix(0, 2) = v3;
@@ -122,6 +124,48 @@ TEST_F(TensorFlowSessionFromSavedModelGeneratorTest,
       output_side_packets.Tag(kSessionTag).Get<TensorFlowSession>();
   // Session must be set.
   ASSERT_NE(session.session, nullptr);
+}
+
+TEST_F(TensorFlowSessionFromSavedModelGeneratorTest,
+       CreateSessionFromSidePacketWithCorrectSignatureName) {
+  generator_options_->clear_saved_model_path();
+  PacketSet input_side_packets(
+      tool::CreateTagMap({"STRING_SAVED_MODEL_PATH:saved_model_dir",
+                          "STRING_SIGNATURE_NAME:signature_name"})
+          .value());
+  input_side_packets.Tag(kStringSavedModelPathTag) =
+      Adopt(new std::string(GetSavedModelDir()));
+  input_side_packets.Tag(kStringSignatureNameTag) =
+      Adopt(new std::string("serving_default"));
+  PacketSet output_side_packets(
+      tool::CreateTagMap({"SESSION:session"}).value());
+  absl::Status run_status = tool::RunGenerateAndValidateTypes(
+      "TensorFlowSessionFromSavedModelGenerator", extendable_options_,
+      input_side_packets, &output_side_packets);
+  MP_EXPECT_OK(run_status) << run_status.message();
+  const TensorFlowSession& session =
+      output_side_packets.Tag(kSessionTag).Get<TensorFlowSession>();
+  // Session must be set.
+  ASSERT_NE(session.session, nullptr);
+}
+
+TEST_F(TensorFlowSessionFromSavedModelGeneratorTest,
+       CreateSessionFromSidePacketWithWrongSignatureName) {
+  generator_options_->clear_saved_model_path();
+  PacketSet input_side_packets(
+      tool::CreateTagMap({"STRING_SAVED_MODEL_PATH:saved_model_dir",
+                          "STRING_SIGNATURE_NAME:signature_name"})
+          .value());
+  input_side_packets.Tag(kStringSavedModelPathTag) =
+      Adopt(new std::string(GetSavedModelDir()));
+  input_side_packets.Tag(kStringSignatureNameTag) =
+      Adopt(new std::string("wrong_signature_name"));
+  PacketSet output_side_packets(
+      tool::CreateTagMap({"SESSION:session"}).value());
+  absl::Status run_status = tool::RunGenerateAndValidateTypes(
+      "TensorFlowSessionFromSavedModelGenerator", extendable_options_,
+      input_side_packets, &output_side_packets);
+  EXPECT_THAT(run_status, StatusIs(absl::StatusCode::kNotFound));
 }
 
 // Integration test. Verifies that TensorFlowInferenceCalculator correctly
@@ -220,7 +264,7 @@ TEST_F(TensorFlowSessionFromSavedModelGeneratorTest,
   // Session must be set.
   ASSERT_NE(session.session, nullptr);
   std::vector<tensorflow::DeviceAttributes> devices;
-  ASSERT_EQ(session.session->ListDevices(&devices), tensorflow::Status::OK());
+  ASSERT_EQ(session.session->ListDevices(&devices), tensorflow::OkStatus());
   EXPECT_THAT(devices.size(), 10);
 }
 

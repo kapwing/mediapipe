@@ -26,6 +26,7 @@
 #include "absl/status/status.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/substitute.h"
 #include "mediapipe/framework/calculator.pb.h"
@@ -34,7 +35,6 @@
 #include "mediapipe/framework/formats/image_format.pb.h"
 #include "mediapipe/framework/port/advanced_proto_inc.h"
 #include "mediapipe/framework/port/file_helpers.h"
-#include "mediapipe/framework/port/gtest.h"
 #include "mediapipe/framework/port/logging.h"
 #include "mediapipe/framework/port/proto_ns.h"
 #include "mediapipe/framework/port/ret_check.h"
@@ -183,15 +183,16 @@ absl::Status CompareImageFrames(const ImageFrame& image1,
     case ImageFormat::SRGB:
     case ImageFormat::SRGBA:
     case ImageFormat::LAB8:
-      return CompareDiff<uint8>(image1, image2, max_color_diff, max_alpha_diff,
-                                max_avg_diff, diff_image);
+      return CompareDiff<uint8_t>(image1, image2, max_color_diff,
+                                  max_alpha_diff, max_avg_diff, diff_image);
     case ImageFormat::GRAY16:
     case ImageFormat::SRGB48:
     case ImageFormat::SRGBA64:
-      return CompareDiff<uint16>(image1, image2, max_color_diff, max_alpha_diff,
-                                 max_avg_diff, diff_image);
+      return CompareDiff<uint16_t>(image1, image2, max_color_diff,
+                                   max_alpha_diff, max_avg_diff, diff_image);
     case ImageFormat::VEC32F1:
     case ImageFormat::VEC32F2:
+    case ImageFormat::VEC32F4:
       return CompareDiff<float>(image1, image2, max_color_diff, max_alpha_diff,
                                 max_avg_diff, diff_image);
     default:
@@ -215,7 +216,8 @@ absl::Status CompareAndSaveImageOutput(
     const ImageFrameComparisonOptions& options) {
   ASSIGN_OR_RETURN(auto output_img_path, SavePngTestOutput(actual, "output"));
 
-  auto expected = LoadTestImage(GetTestFilePath(golden_image_path));
+  auto expected =
+      LoadTestImage(GetTestFilePath(golden_image_path), ImageFormat::UNKNOWN);
   if (!expected.ok()) {
     return expected.status();
   }
@@ -243,6 +245,9 @@ std::string GetTestOutputsDir() {
     size_t n = confstr(_CS_DARWIN_USER_TEMP_DIR, path, sizeof(path));
     if (n > 0 && n < sizeof(path)) return path;
 #endif  // __APPLE__
+#ifdef __ANDROID__
+    return "/data/local/tmp/";
+#endif  // __ANDROID__
     output_dir = "/tmp";
   }
   return output_dir;
@@ -256,11 +261,8 @@ std::string GetTestFilePath(absl::string_view relative_path) {
   return file::JoinPath(GetTestRootDir(), relative_path);
 }
 
-absl::StatusOr<std::unique_ptr<ImageFrame>> LoadTestImage(
-    absl::string_view path, ImageFormat::Format format) {
-  std::string encoded;
-  MP_RETURN_IF_ERROR(mediapipe::file::GetContents(path, &encoded));
-
+absl::StatusOr<std::unique_ptr<ImageFrame>> DecodeTestImage(
+    absl::string_view encoded, ImageFormat::Format format) {
   // stbi_load determines the output pixel format based on the desired channels.
   // 0 means "use whatever's in the file".
   int desired_channels = format == ImageFormat::UNKNOWN ? 0
@@ -272,10 +274,10 @@ absl::StatusOr<std::unique_ptr<ImageFrame>> LoadTestImage(
       << "unsupported output format requested: " << format;
 
   int width, height, channels_in_file;
-  auto data = stbi_load_from_memory(reinterpret_cast<stbi_uc*>(encoded.data()),
-                                    encoded.size(), &width, &height,
-                                    &channels_in_file, desired_channels);
-  RET_CHECK(data) << "failed to decode image data from: " << path;
+  auto data = stbi_load_from_memory(
+      reinterpret_cast<const stbi_uc*>(encoded.data()), encoded.size(), &width,
+      &height, &channels_in_file, desired_channels);
+  RET_CHECK(data) << "failed to decode image data";
 
   // If we didn't specify a desired format, it will be determined by what the
   // file contains.
@@ -293,6 +295,13 @@ absl::StatusOr<std::unique_ptr<ImageFrame>> LoadTestImage(
       format, width, height, width * output_channels, data, stbi_image_free);
 }
 
+absl::StatusOr<std::unique_ptr<ImageFrame>> LoadTestImage(
+    absl::string_view path, ImageFormat::Format format) {
+  std::string encoded;
+  MP_RETURN_IF_ERROR(mediapipe::file::GetContents(path, &encoded));
+  return DecodeTestImage(encoded, format);
+}
+
 std::unique_ptr<ImageFrame> LoadTestPng(absl::string_view path,
                                         ImageFormat::Format format) {
   return nullptr;
@@ -303,6 +312,13 @@ std::unique_ptr<ImageFrame> LoadTestPng(absl::string_view path,
 // Returns the path to the output if successful.
 absl::StatusOr<std::string> SavePngTestOutput(
     const mediapipe::ImageFrame& image, absl::string_view prefix) {
+  absl::flat_hash_set<ImageFormat::Format> supported_formats = {
+      ImageFormat::GRAY8, ImageFormat::SRGB, ImageFormat::SRGBA,
+      ImageFormat::LAB8, ImageFormat::SBGRA};
+  if (!supported_formats.contains(image.Format())) {
+    return absl::CancelledError(
+        absl::StrFormat("Format %d can not be saved to PNG.", image.Format()));
+  }
   std::string now_string = absl::FormatTime(absl::Now());
   std::string output_relative_path =
       absl::StrCat(prefix, "_", now_string, ".png");
@@ -343,17 +359,17 @@ std::unique_ptr<ImageFrame> GenerateLuminanceImage(
   auto luminance_image =
       absl::make_unique<ImageFrame>(original_image.Format(), width, height,
                                     ImageFrame::kGlDefaultAlignmentBoundary);
-  const uint8* pixel1 = original_image.PixelData();
-  uint8* pixel2 = luminance_image->MutablePixelData();
+  const uint8_t* pixel1 = original_image.PixelData();
+  uint8_t* pixel2 = luminance_image->MutablePixelData();
   const int width_padding1 = original_image.WidthStep() - width * channels;
   const int width_padding2 = luminance_image->WidthStep() - width * channels;
   for (int row = 0; row < height; ++row) {
     for (int col = 0; col < width; ++col) {
       float luminance =
           pixel1[0] * 0.2125f + pixel1[1] * 0.7154f + pixel1[2] * 0.0721f;
-      uint8 luminance_byte = 255;
+      uint8_t luminance_byte = 255;
       if (luminance < 255.0f) {
-        luminance_byte = static_cast<uint8>(luminance);
+        luminance_byte = static_cast<uint8_t>(luminance);
       }
       pixel2[0] = luminance_byte;
       pixel2[1] = luminance_byte;

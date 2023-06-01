@@ -17,6 +17,7 @@
 #include "absl/strings/str_format.h"
 #include "absl/types/variant.h"
 #include "mediapipe/framework/formats/location.h"
+#include "mediapipe/framework/formats/location_opencv.h"
 #include "mediapipe/framework/port/canonical_errors.h"
 #include "mediapipe/framework/port/map_util.h"
 #include "mediapipe/framework/port/status.h"
@@ -86,7 +87,7 @@ Status TensorsToDetections(const ::tensorflow::Tensor& num_detections,
       const auto& num_boxes_scalar = num_detections.scalar<float>();
       num_boxes = static_cast<int>(num_boxes_scalar());
     } else {
-      num_boxes = num_detections.scalar<int32>()();
+      num_boxes = num_detections.scalar<int32_t>()();
     }
     if (boxes.dim_size(0) < num_boxes) {
       return InvalidArgumentError(
@@ -195,7 +196,7 @@ Status TensorsToDetections(const ::tensorflow::Tensor& num_detections,
         }
       }
       LocationData mask_location_data;
-      mediapipe::Location::CreateCvMaskLocation<float>(mask_image)
+      mediapipe::CreateCvMaskLocation<float>(mask_image)
           .ConvertToProto(&mask_location_data);
       location_data->MergeFrom(mask_location_data);
     }

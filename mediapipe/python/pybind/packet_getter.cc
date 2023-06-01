@@ -14,6 +14,8 @@
 
 #include "mediapipe/python/pybind/packet_getter.h"
 
+#include <string>
+
 #include "absl/status/statusor.h"
 #include "mediapipe/framework/formats/image.h"
 #include "mediapipe/framework/formats/matrix.h"
@@ -100,15 +102,15 @@ void PublicPacketGetters(pybind11::module* m) {
       "get_int",
       [](const Packet& packet) {
         if (packet.ValidateAsType<int>().ok()) {
-          return static_cast<int64>(packet.Get<int>());
-        } else if (packet.ValidateAsType<int8>().ok()) {
-          return static_cast<int64>(packet.Get<int8>());
-        } else if (packet.ValidateAsType<int16>().ok()) {
-          return static_cast<int64>(packet.Get<int16>());
-        } else if (packet.ValidateAsType<int32>().ok()) {
-          return static_cast<int64>(packet.Get<int32>());
-        } else if (packet.ValidateAsType<int64>().ok()) {
-          return static_cast<int64>(packet.Get<int64>());
+          return static_cast<int64_t>(packet.Get<int>());
+        } else if (packet.ValidateAsType<int8_t>().ok()) {
+          return static_cast<int64_t>(packet.Get<int8_t>());
+        } else if (packet.ValidateAsType<int16_t>().ok()) {
+          return static_cast<int64_t>(packet.Get<int16_t>());
+        } else if (packet.ValidateAsType<int32_t>().ok()) {
+          return static_cast<int64_t>(packet.Get<int32_t>());
+        } else if (packet.ValidateAsType<int64_t>().ok()) {
+          return static_cast<int64_t>(packet.Get<int64_t>());
         }
         throw RaisePyError(
             PyExc_ValueError,
@@ -133,14 +135,14 @@ void PublicPacketGetters(pybind11::module* m) {
   m->def(
       "get_uint",
       [](const Packet& packet) {
-        if (packet.ValidateAsType<uint8>().ok()) {
-          return static_cast<std::uint64_t>(packet.Get<uint8>());
-        } else if (packet.ValidateAsType<uint16>().ok()) {
-          return static_cast<std::uint64_t>(packet.Get<uint16>());
-        } else if (packet.ValidateAsType<uint32>().ok()) {
-          return static_cast<std::uint64_t>(packet.Get<uint32>());
-        } else if (packet.ValidateAsType<uint64>().ok()) {
-          return static_cast<std::uint64_t>(packet.Get<uint64>());
+        if (packet.ValidateAsType<uint8_t>().ok()) {
+          return static_cast<std::uint64_t>(packet.Get<uint8_t>());
+        } else if (packet.ValidateAsType<uint16_t>().ok()) {
+          return static_cast<std::uint64_t>(packet.Get<uint16_t>());
+        } else if (packet.ValidateAsType<uint32_t>().ok()) {
+          return static_cast<std::uint64_t>(packet.Get<uint32_t>());
+        } else if (packet.ValidateAsType<uint64_t>().ok()) {
+          return static_cast<std::uint64_t>(packet.Get<uint64_t>());
         }
         throw RaisePyError(
             PyExc_ValueError,
@@ -194,19 +196,19 @@ void PublicPacketGetters(pybind11::module* m) {
       [](const Packet& packet) {
         if (packet.ValidateAsType<std::vector<int>>().ok()) {
           auto int_list = packet.Get<std::vector<int>>();
-          return std::vector<int64>(int_list.begin(), int_list.end());
-        } else if (packet.ValidateAsType<std::vector<int8>>().ok()) {
-          auto int_list = packet.Get<std::vector<int8>>();
-          return std::vector<int64>(int_list.begin(), int_list.end());
-        } else if (packet.ValidateAsType<std::vector<int16>>().ok()) {
-          auto int_list = packet.Get<std::vector<int16>>();
-          return std::vector<int64>(int_list.begin(), int_list.end());
-        } else if (packet.ValidateAsType<std::vector<int32>>().ok()) {
-          auto int_list = packet.Get<std::vector<int32>>();
-          return std::vector<int64>(int_list.begin(), int_list.end());
-        } else if (packet.ValidateAsType<std::vector<int64>>().ok()) {
-          auto int_list = packet.Get<std::vector<int64>>();
-          return std::vector<int64>(int_list.begin(), int_list.end());
+          return std::vector<int64_t>(int_list.begin(), int_list.end());
+        } else if (packet.ValidateAsType<std::vector<int8_t>>().ok()) {
+          auto int_list = packet.Get<std::vector<int8_t>>();
+          return std::vector<int64_t>(int_list.begin(), int_list.end());
+        } else if (packet.ValidateAsType<std::vector<int16_t>>().ok()) {
+          auto int_list = packet.Get<std::vector<int16_t>>();
+          return std::vector<int64_t>(int_list.begin(), int_list.end());
+        } else if (packet.ValidateAsType<std::vector<int32_t>>().ok()) {
+          auto int_list = packet.Get<std::vector<int32_t>>();
+          return std::vector<int64_t>(int_list.begin(), int_list.end());
+        } else if (packet.ValidateAsType<std::vector<int64_t>>().ok()) {
+          auto int_list = packet.Get<std::vector<int64_t>>();
+          return std::vector<int64_t>(int_list.begin(), int_list.end());
         }
         throw RaisePyError(PyExc_ValueError,
                            "Packet doesn't contain int, int8, int16, int32, or "
@@ -247,7 +249,22 @@ void PublicPacketGetters(pybind11::module* m) {
 )doc");
 
   m->def(
-      "get_float_list", &GetContent<std::vector<float>>,
+      "get_float_list",
+      [](const Packet& packet) {
+        if (packet.ValidateAsType<std::vector<float>>().ok()) {
+          return packet.Get<std::vector<float>>();
+        } else if (packet.ValidateAsType<std::array<float, 16>>().ok()) {
+          auto float_array = packet.Get<std::array<float, 16>>();
+          return std::vector<float>(float_array.begin(), float_array.end());
+        } else if (packet.ValidateAsType<std::array<float, 4>>().ok()) {
+          auto float_array = packet.Get<std::array<float, 4>>();
+          return std::vector<float>(float_array.begin(), float_array.end());
+        } else {
+          throw RaisePyError(PyExc_ValueError,
+                             "Packet doesn't contain std::vector<float> or "
+                             "std::array<float, 4 / 16> containers.");
+        }
+      },
       R"doc(Get the content of a MediaPipe float vector Packet as a float list.
 
   Args:
@@ -280,6 +297,25 @@ void PublicPacketGetters(pybind11::module* m) {
   Examples:
     packet = mp.packet_creator.create_string_vector(['a', 'b', 'c'])
     data = mp.packet_getter.get_str_list(packet)
+)doc");
+
+  m->def(
+      "get_image_list", &GetContent<std::vector<Image>>,
+      R"doc(Get the content of a MediaPipe Packet of image vector as a list of MediaPipe Images.
+
+  Args:
+    packet: A MediaPipe Packet that holds std:vector<mediapipe::Image>.
+
+  Returns:
+    A list of MediaPipe Images.
+
+  Raises:
+    ValueError: If the Packet doesn't contain std:vector<mediapipe::Image>.
+
+  Examples:
+    packet = mp.packet_creator.create_image_vector([
+        image1, image2, image3])
+    image_list = mp.packet_getter.get_image_list(packet)
 )doc");
 
   m->def(

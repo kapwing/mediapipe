@@ -45,6 +45,7 @@ from mediapipe.python.solutions.face_mesh_connections import FACEMESH_LEFT_EYE
 from mediapipe.python.solutions.face_mesh_connections import FACEMESH_LEFT_EYEBROW
 from mediapipe.python.solutions.face_mesh_connections import FACEMESH_LEFT_IRIS
 from mediapipe.python.solutions.face_mesh_connections import FACEMESH_LIPS
+from mediapipe.python.solutions.face_mesh_connections import FACEMESH_NOSE
 from mediapipe.python.solutions.face_mesh_connections import FACEMESH_RIGHT_EYE
 from mediapipe.python.solutions.face_mesh_connections import FACEMESH_RIGHT_EYEBROW
 from mediapipe.python.solutions.face_mesh_connections import FACEMESH_RIGHT_IRIS
@@ -99,7 +100,7 @@ class FaceMesh(SolutionBase):
             'use_prev_landmarks': not static_image_mode,
         },
         calculator_params={
-            'facedetectionshortrangecpu__facedetectionshortrangecommon__TensorsToDetectionsCalculator.min_score_thresh':
+            'facedetectionshortrangecpu__facedetectionshortrange__facedetection__TensorsToDetectionsCalculator.min_score_thresh':
                 min_detection_confidence,
             'facelandmarkcpu__ThresholdingCalculator.threshold':
                 min_tracking_confidence,

@@ -28,33 +28,32 @@ from typing import Any, Iterable, List, Mapping, NamedTuple, Optional, Union
 
 import numpy as np
 
+from google.protobuf.internal import containers
 from google.protobuf import descriptor
 from google.protobuf import message
 # resources dependency
 # pylint: disable=unused-import
-# pylint: enable=unused-import
-from mediapipe.framework import calculator_pb2
-# pylint: disable=unused-import
-from mediapipe.framework.formats import detection_pb2
 from mediapipe.calculators.core import constant_side_packet_calculator_pb2
 from mediapipe.calculators.image import image_transformation_calculator_pb2
 from mediapipe.calculators.tensor import tensors_to_detections_calculator_pb2
 from mediapipe.calculators.util import landmarks_smoothing_calculator_pb2
 from mediapipe.calculators.util import logic_calculator_pb2
 from mediapipe.calculators.util import thresholding_calculator_pb2
+from mediapipe.framework import calculator_pb2
 from mediapipe.framework.formats import classification_pb2
+from mediapipe.framework.formats import detection_pb2
 from mediapipe.framework.formats import landmark_pb2
 from mediapipe.framework.formats import rect_pb2
 from mediapipe.modules.objectron.calculators import annotation_data_pb2
 from mediapipe.modules.objectron.calculators import lift_2d_frame_annotation_to_3d_calculator_pb2
 # pylint: enable=unused-import
+from mediapipe.python import packet_creator
+from mediapipe.python import packet_getter
 from mediapipe.python._framework_bindings import calculator_graph
 from mediapipe.python._framework_bindings import image_frame
 from mediapipe.python._framework_bindings import packet
 from mediapipe.python._framework_bindings import resource_util
 from mediapipe.python._framework_bindings import validated_graph_config
-import mediapipe.python.packet_creator as packet_creator
-import mediapipe.python.packet_getter as packet_getter
 
 RGB_CHANNELS = 3
 # TODO: Enable calculator options modification for more calculators.
@@ -99,6 +98,7 @@ class PacketDataType(enum.Enum):
   FLOAT_LIST = 'float_list'
   AUDIO = 'matrix'
   IMAGE = 'image'
+  IMAGE_LIST = 'image_list'
   IMAGE_FRAME = 'image_frame'
   PROTO = 'proto'
   PROTO_LIST = 'proto_list'
@@ -170,6 +170,8 @@ NAME_TO_TYPE: Mapping[str, 'PacketDataType'] = {
         PacketDataType.PROTO,
     '::mediapipe::Image':
         PacketDataType.IMAGE,
+    '::std::vector<::mediapipe::Image>':
+        PacketDataType.IMAGE_LIST,
     '::std::vector<::mediapipe::Classification>':
         PacketDataType.PROTO_LIST,
     '::std::vector<::mediapipe::ClassificationList>':
@@ -216,6 +218,7 @@ class SolutionBase:
       binary_graph_path: Optional[str] = None,
       graph_config: Optional[calculator_pb2.CalculatorGraphConfig] = None,
       calculator_params: Optional[Mapping[str, Any]] = None,
+      graph_options: Optional[message.Message] = None,
       side_inputs: Optional[Mapping[str, Any]] = None,
       outputs: Optional[List[str]] = None,
       stream_type_hints: Optional[Mapping[str, PacketDataType]] = None):
@@ -227,6 +230,7 @@ class SolutionBase:
         format.
       calculator_params: A mapping from the
         {calculator_name}.{options_field_name} str to the field value.
+      graph_options: The graph options protobuf for the mediapipe graph.
       side_inputs: A mapping from the side packet name to the packet raw data.
       outputs: A list of the graph output stream names to observe. If the list
         is empty, all the output streams listed in the graph config will be
@@ -267,6 +271,10 @@ class SolutionBase:
     if calculator_params:
       self._modify_calculator_options(canonical_graph_config_proto,
                                       calculator_params)
+    if graph_options:
+      self._set_extension(canonical_graph_config_proto.graph_options,
+                          graph_options)
+
     self._graph = calculator_graph.CalculatorGraph(
         graph_config=canonical_graph_config_proto)
     self._simulated_timestamp = 0
@@ -529,6 +537,50 @@ class SolutionBase:
         break
     if num_modified < len(nested_calculator_params):
       raise ValueError('Not all calculator params are valid.')
+
+  def create_graph_options(self, options_message: message.Message,
+                           values: Mapping[str, Any]) -> message.Message:
+    """Sets protobuf field values.
+
+    Args:
+      options_message: the options protobuf message.
+      values: field value pairs, where each field may be a "." separated path.
+
+    Returns:
+      the options protobuf message.
+    """
+
+    if hasattr(values, 'items'):
+      values = values.items()
+    for pair in values:
+      (field, value) = pair
+      fields = field.split('.')
+      m = options_message
+      while len(fields) > 1:
+        m = getattr(m, fields[0])
+        del fields[0]
+      v = getattr(m, fields[0])
+      if hasattr(v, 'append'):
+        del v[:]
+        v.extend(value)
+      elif hasattr(v, 'CopyFrom'):
+        v.CopyFrom(value)
+      else:
+        setattr(m, fields[0], value)
+    return options_message
+
+  def _set_extension(self,
+                     extension_list: containers.RepeatedCompositeFieldContainer,
+                     extension_value: message.Message) -> None:
+    """Sets one value in a repeated protobuf.Any extension field."""
+    for extension_any in extension_list:
+      if extension_any.Is(extension_value.DESCRIPTOR):
+        v = type(extension_value)()
+        extension_any.Unpack(v)
+        v.MergeFrom(extension_value)
+        extension_any.Pack(v)
+        return
+    extension_list.add().Pack(extension_value)
 
   def _make_packet(self, packet_data_type: PacketDataType,
                    data: Any) -> packet.Packet:

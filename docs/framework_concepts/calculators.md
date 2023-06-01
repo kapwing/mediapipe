@@ -1,5 +1,6 @@
 ---
-layout: default
+layout: forward
+target: https://developers.google.com/mediapipe/framework/framework_concepts/calculators
 title: Calculators
 parent: Framework Concepts
 nav_order: 1
@@ -11,6 +12,12 @@ nav_order: 1
 1. TOC
 {:toc}
 ---
+
+**Attention:** *Thanks for your interest in MediaPipe! We have moved to
+[https://developers.google.com/mediapipe](https://developers.google.com/mediapipe)
+as the primary developer documentation site for MediaPipe as of April 3, 2023.*
+
+----
 
 Each calculator is a node of a graph. We describe how to create a new
 calculator, how to initialize a calculator, how to perform its calculations,
@@ -133,7 +140,7 @@ write outputs. After Close returns, the calculator is destroyed.
 Calculators with no inputs are referred to as sources. A source calculator
 continues to have `Process()` called as long as it returns an `Ok` status. A
 source calculator indicates that it is exhausted by returning a stop status
-(i.e. MediaPipe::tool::StatusStop).
+(i.e. [`mediaPipe::tool::StatusStop()`](https://github.com/google/mediapipe/tree/master/mediapipe/framework/tool/status_util.cc).).
 
 ## Identifying inputs and outputs
 
@@ -459,6 +466,6 @@ node {
 The diagram below shows how the `PacketClonerCalculator` defines its output
 packets (bottom) based on its series of input packets (top).
 
-![Graph using PacketClonerCalculator](../images/packet_cloner_calculator.png)  |
+![Graph using PacketClonerCalculator](https://mediapipe.dev/images/packet_cloner_calculator.png)  |
 :--------------------------------------------------------------------------: |
 *Each time it receives a packet on its TICK input stream, the PacketClonerCalculator outputs the most recent packet from each of its input streams. The sequence of output packets (bottom) is determined by the sequence of input packets (top) and their timestamps. The timestamps are shown along the right side of the diagram.* |

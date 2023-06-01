@@ -142,7 +142,7 @@ class ContentZoomingCalculator : public CalculatorBase {
   // Stores the first crop rectangle.
   mediapipe::NormalizedRect first_rect_;
   // Stores the time of the last "only_required" input.
-  int64 last_only_required_detection_;
+  int64_t last_only_required_detection_;
   // Rect values of last message with detection(s).
   int last_measured_height_;
   int last_measured_x_offset_;
@@ -203,6 +203,7 @@ absl::Status ContentZoomingCalculator::GetContract(
 }
 
 absl::Status ContentZoomingCalculator::Open(mediapipe::CalculatorContext* cc) {
+  cc->SetOffset(mediapipe::TimestampDiff(0));
   options_ = cc->Options<ContentZoomingCalculatorOptions>();
   if (options_.has_kinematic_options()) {
     return mediapipe::UnknownErrorBuilder(MEDIAPIPE_LOC)
@@ -279,35 +280,45 @@ mediapipe::autoflip::RectF ShiftDetection(
 }
 absl::Status UpdateRanges(const SalientRegion& region,
                           const float shift_vertical,
-                          const float shift_horizontal, float* xmin,
-                          float* xmax, float* ymin, float* ymax) {
+                          const float shift_horizontal,
+                          const float pad_vertical, const float pad_horizontal,
+                          float* xmin, float* xmax, float* ymin, float* ymax) {
   if (!region.has_location_normalized()) {
     return mediapipe::UnknownErrorBuilder(MEDIAPIPE_LOC)
            << "SalientRegion did not have location normalized set.";
   }
   auto location = ShiftDetection(region.location_normalized(), shift_vertical,
                                  shift_horizontal);
-  *xmin = fmin(*xmin, location.x());
-  *xmax = fmax(*xmax, location.x() + location.width());
-  *ymin = fmin(*ymin, location.y());
-  *ymax = fmax(*ymax, location.y() + location.height());
+
+  const float x_padding = pad_horizontal * location.width();
+  const float y_padding = pad_vertical * location.height();
+
+  *xmin = fmin(*xmin, location.x() - x_padding);
+  *xmax = fmax(*xmax, location.x() + location.width() + x_padding);
+  *ymin = fmin(*ymin, location.y() - y_padding);
+  *ymax = fmax(*ymax, location.y() + location.height() + y_padding);
 
   return absl::OkStatus();
 }
 absl::Status UpdateRanges(const mediapipe::Detection& detection,
                           const float shift_vertical,
-                          const float shift_horizontal, float* xmin,
-                          float* xmax, float* ymin, float* ymax) {
+                          const float shift_horizontal,
+                          const float pad_vertical, const float pad_horizontal,
+                          float* xmin, float* xmax, float* ymin, float* ymax) {
   RET_CHECK(detection.location_data().format() ==
             mediapipe::LocationData::RELATIVE_BOUNDING_BOX)
       << "Face detection input is lacking required relative_bounding_box()";
   const auto& location =
       ShiftDetection(detection.location_data().relative_bounding_box(),
                      shift_vertical, shift_horizontal);
-  *xmin = fmin(*xmin, location.xmin());
-  *xmax = fmax(*xmax, location.xmin() + location.width());
-  *ymin = fmin(*ymin, location.ymin());
-  *ymax = fmax(*ymax, location.ymin() + location.height());
+
+  const float x_padding = pad_horizontal * location.width();
+  const float y_padding = pad_vertical * location.height();
+
+  *xmin = fmin(*xmin, location.xmin() - x_padding);
+  *xmax = fmax(*xmax, location.xmin() + location.width() + x_padding);
+  *ymin = fmin(*ymin, location.ymin() - y_padding);
+  *ymax = fmax(*ymax, location.ymin() + location.height() + y_padding);
 
   return absl::OkStatus();
 }
@@ -489,7 +500,7 @@ bool ContentZoomingCalculator::IsAnimatingToFirstRect(
     return false;
   }
 
-  const int64 delta_us = (timestamp - first_rect_timestamp_).Value();
+  const int64_t delta_us = (timestamp - first_rect_timestamp_).Value();
   return (0 <= delta_us && delta_us <= options_.us_to_first_rect());
 }
 
@@ -511,8 +522,8 @@ absl::StatusOr<mediapipe::Rect> ContentZoomingCalculator::GetAnimationRect(
   RET_CHECK(IsAnimatingToFirstRect(timestamp))
       << "Must only be called if animating to first rect.";
 
-  const int64 delta_us = (timestamp - first_rect_timestamp_).Value();
-  const int64 delay = options_.us_to_first_rect_delay();
+  const int64_t delta_us = (timestamp - first_rect_timestamp_).Value();
+  const int64_t delay = options_.us_to_first_rect_delay();
   const double interpolation = easeInOutQuad(std::max(
       0.0, (delta_us - delay) /
                static_cast<double>(options_.us_to_first_rect() - delay)));
@@ -818,7 +829,9 @@ absl::Status ContentZoomingCalculator::GetDetectionsBox(
       *only_required_found = true;
       MP_RETURN_IF_ERROR(UpdateRanges(
           region, options_.detection_shift_vertical(),
-          options_.detection_shift_horizontal(), xmin, xmax, ymin, ymax));
+          options_.detection_shift_horizontal(),
+          options_.extra_vertical_padding(),
+          options_.extra_horizontal_padding(), xmin, xmax, ymin, ymax));
     }
   }
 
@@ -864,7 +877,9 @@ absl::Status ContentZoomingCalculator::GetDetectionsBox(
         *only_required_found = true;
         MP_RETURN_IF_ERROR(UpdateRanges(
             detection, options_.detection_shift_vertical(),
-            options_.detection_shift_horizontal(), xmin, xmax, ymin, ymax));
+            options_.detection_shift_horizontal(),
+            options_.extra_vertical_padding(),
+            options_.extra_horizontal_padding(), xmin, xmax, ymin, ymax));
       }
     }
   }

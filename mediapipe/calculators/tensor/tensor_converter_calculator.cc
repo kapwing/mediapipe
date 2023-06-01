@@ -31,6 +31,7 @@
 #import <Metal/Metal.h>
 #import <MetalKit/MetalKit.h>
 
+#include "mediapipe/framework/formats/tensor_mtl_buffer_view.h"
 #import "mediapipe/gpu/MPPMetalHelper.h"
 #elif MEDIAPIPE_OPENGL_ES_VERSION >= MEDIAPIPE_OPENGL_ES_30
 #include "mediapipe/gpu/gl_calculator_helper.h"
@@ -250,8 +251,8 @@ absl::Status TensorConverterCalculator::ProcessCPU(CalculatorContext* cc) {
 
     // Copy image data into tensor.
     if (image_frame.ByteDepth() == 1) {
-      MP_RETURN_IF_ERROR(NormalizeImage<uint8>(image_frame, flip_vertically_,
-                                               cpu_view.buffer<float>()));
+      MP_RETURN_IF_ERROR(NormalizeImage<uint8_t>(image_frame, flip_vertically_,
+                                                 cpu_view.buffer<float>()));
     } else if (image_frame.ByteDepth() == 4) {
       MP_RETURN_IF_ERROR(NormalizeImage<float>(image_frame, flip_vertically_,
                                                cpu_view.buffer<float>()));
@@ -296,7 +297,6 @@ absl::Status TensorConverterCalculator::ProcessGPU(CalculatorContext* cc) {
   output_tensors->emplace_back(Tensor::ElementType::kFloat32,
                                Tensor::Shape{1, height, width, channels});
 #if MEDIAPIPE_METAL_ENABLED
-  id<MTLDevice> device = gpu_helper_.mtlDevice;
   id<MTLCommandBuffer> command_buffer = [gpu_helper_ commandBuffer];
   command_buffer.label = @"TensorConverterCalculatorConvert";
   id<MTLComputeCommandEncoder> compute_encoder =
@@ -305,7 +305,7 @@ absl::Status TensorConverterCalculator::ProcessGPU(CalculatorContext* cc) {
   id<MTLTexture> src_texture = [gpu_helper_ metalTextureWithGpuBuffer:input];
   [compute_encoder setTexture:src_texture atIndex:0];
   auto output_view =
-      output_tensors->at(0).GetMtlBufferWriteView(command_buffer);
+      MtlBufferView::GetWriteView(output_tensors->at(0), command_buffer);
   [compute_encoder setBuffer:output_view.buffer() offset:0 atIndex:1];
   MTLSize threads_per_group = MTLSizeMake(kWorkgroupSize, kWorkgroupSize, 1);
   MTLSize threadgroups =

@@ -19,8 +19,7 @@ package mediapipe;
 import "mediapipe/framework/calculator.proto";
 import "mediapipe/framework/formats/classification.proto";
 import "mediapipe/framework/formats/landmark.proto";
-
-option objc_class_prefix = "MediaPipe";
+import "mediapipe/framework/formats/time_series_header.proto";
 
 message ConstantSidePacketCalculatorOptions {
   extend CalculatorOptions {
@@ -36,6 +35,8 @@ message ConstantSidePacketCalculatorOptions {
       uint64 uint64_value = 5;
       ClassificationList classification_list_value = 6;
       LandmarkList landmark_list_value = 7;
+      double double_value = 9;
+      TimeSeriesHeader time_series_header_value = 10;
     }
   }
 

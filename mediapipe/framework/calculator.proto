@@ -347,7 +347,8 @@ message CalculatorGraphConfig {
   // PacketGenerators can take as a input side packet the output side
   // packet of another PacketGenerator.  The graph of PacketGenerators
   // must be a directed acyclic graph.
-  repeated PacketGeneratorConfig packet_generator = 7;
+  // DEPRECATED: Use a Node to generate side packets.
+  repeated PacketGeneratorConfig packet_generator = 7 [deprecated = true];
   // Number of threads for running calculators in multithreaded mode.
   // If not specified, the scheduler will pick an appropriate number
   // of threads depending on the number of available processors.
@@ -382,7 +383,7 @@ message CalculatorGraphConfig {
   // is empty and no other nodes are running (to prevent possible deadlocks due
   // to a incorrectly specified value). This global parameter is set to 100
   // packets by default to enable pipelining. If any node indicates that it
-  // buffers packets before emitting them, then the max(node_buffer_size,
+  // buffers packets before emitting them, then the max(buffer_size_hint,
   // max_queue_size) is used. Set this parameter to -1 to disable throttling
   // (i.e. the graph will use as much memory as it requires). If not specified,
   // the limit is 100 packets.

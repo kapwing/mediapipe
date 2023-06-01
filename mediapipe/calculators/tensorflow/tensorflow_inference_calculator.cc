@@ -61,12 +61,12 @@ constexpr char kSessionBundleTag[] = "SESSION_BUNDLE";
 // overload GPU/TPU/...
 class SimpleSemaphore {
  public:
-  explicit SimpleSemaphore(uint32 initial_count) : count_(initial_count) {}
+  explicit SimpleSemaphore(uint32_t initial_count) : count_(initial_count) {}
   SimpleSemaphore(const SimpleSemaphore&) = delete;
   SimpleSemaphore(SimpleSemaphore&&) = delete;
 
   // Acquires the semaphore by certain amount.
-  void Acquire(uint32 amount) {
+  void Acquire(uint32_t amount) {
     mutex_.Lock();
     while (count_ < amount) {
       cond_.Wait(&mutex_);
@@ -76,7 +76,7 @@ class SimpleSemaphore {
   }
 
   // Releases the semaphore by certain amount.
-  void Release(uint32 amount) {
+  void Release(uint32_t amount) {
     mutex_.Lock();
     count_ += amount;
     cond_.SignalAll();
@@ -84,7 +84,7 @@ class SimpleSemaphore {
   }
 
  private:
-  uint32 count_;
+  uint32_t count_;
   absl::Mutex mutex_;
   absl::CondVar cond_;
 };
@@ -300,17 +300,26 @@ class TensorFlowInferenceCalculator : public CalculatorBase {
     RET_CHECK(options_.batch_size() == 1 ||
               options_.recurrent_tag_pair().empty())
         << "To use recurrent_tag_pairs, batch_size must be 1.";
+
+    // Helper for StrJoin. Prints key (tag) of map<string, string>.
+    auto TagFormatter =
+        absl::PairFormatter(absl::StreamFormatter(), "",
+                            [](std::string* out, const std::string& second) {});
+
     for (const auto& tag_pair : options_.recurrent_tag_pair()) {
       const std::vector<std::string> tags = absl::StrSplit(tag_pair, ':');
       RET_CHECK_EQ(tags.size(), 2) << "recurrent_tag_pair must be a colon "
                                       "separated string with two components: "
                                    << tag_pair;
+
       RET_CHECK(mediapipe::ContainsKey(tag_to_tensor_map_, tags[0]))
           << "Can't find tag '" << tags[0] << "' in signature "
-          << options_.signature_name();
+          << options_.signature_name() << "; instead found tags "
+          << absl::StrJoin(tag_to_tensor_map_, ", ", TagFormatter);
       RET_CHECK(mediapipe::ContainsKey(tag_to_tensor_map_, tags[1]))
           << "Can't find tag '" << tags[1] << "' in signature "
-          << options_.signature_name();
+          << options_.signature_name() << " ; instead found tags "
+          << absl::StrJoin(tag_to_tensor_map_, ", ", TagFormatter);
       recurrent_feed_tags_.insert(tags[0]);
       recurrent_fetch_tags_to_feed_tags_[tags[1]] = tags[0];
     }
@@ -319,12 +328,14 @@ class TensorFlowInferenceCalculator : public CalculatorBase {
     for (const std::string& tag : cc->Inputs().GetTags()) {
       RET_CHECK(mediapipe::ContainsKey(tag_to_tensor_map_, tag))
           << "Can't find tag '" << tag << "' in signature "
-          << options_.signature_name();
+          << options_.signature_name() << "; instead found tags "
+          << absl::StrJoin(tag_to_tensor_map_, ", ", TagFormatter);
     }
     for (const std::string& tag : cc->Outputs().GetTags()) {
       RET_CHECK(mediapipe::ContainsKey(tag_to_tensor_map_, tag))
           << "Can't find tag '" << tag << "' in signature "
-          << options_.signature_name();
+          << options_.signature_name() << "; instead found tags "
+          << absl::StrJoin(tag_to_tensor_map_, ", ", TagFormatter);
     }
 
     {
@@ -477,7 +488,7 @@ class TensorFlowInferenceCalculator : public CalculatorBase {
   // necessary.
   absl::Status OutputBatch(CalculatorContext* cc,
                            std::unique_ptr<InferenceState> inference_state) {
-    const int64 start_time = absl::ToUnixMicros(clock_->TimeNow());
+    const int64_t start_time = absl::ToUnixMicros(clock_->TimeNow());
     std::vector<std::pair<mediapipe::ProtoString, tf::Tensor>> input_tensors;
 
     for (auto& keyed_tensors : inference_state->input_tensor_batches_) {
@@ -494,11 +505,13 @@ class TensorFlowInferenceCalculator : public CalculatorBase {
               << keyed_tensors.first;
         }
       } else {
-        // Pad by replicating the first tensor, then ignore the values.
-        keyed_tensors.second.resize(options_.batch_size());
-        std::fill(keyed_tensors.second.begin() +
-                      inference_state->batch_timestamps_.size(),
-                  keyed_tensors.second.end(), keyed_tensors.second[0]);
+        if (options_.pad_to_batch_size()) {
+          // Pad by replicating the first tensor, then ignore the values.
+          keyed_tensors.second.resize(options_.batch_size());
+          std::fill(keyed_tensors.second.begin() +
+                        inference_state->batch_timestamps_.size(),
+                    keyed_tensors.second.end(), keyed_tensors.second[0]);
+        }
         tf::Tensor concated;
         const tf::Status concat_status =
             tf::tensor::Concat(keyed_tensors.second, &concated);
@@ -531,7 +544,7 @@ class TensorFlowInferenceCalculator : public CalculatorBase {
           get_session_run_throttle(options_.max_concurrent_session_runs());
       session_run_throttle->Acquire(1);
     }
-    const int64 run_start_time = absl::ToUnixMicros(clock_->TimeNow());
+    const int64_t run_start_time = absl::ToUnixMicros(clock_->TimeNow());
     tf::Status tf_status;
     {
 #if !defined(MEDIAPIPE_MOBILE) && !defined(__APPLE__)
@@ -549,7 +562,7 @@ class TensorFlowInferenceCalculator : public CalculatorBase {
     // informative error message.
     RET_CHECK(tf_status.ok()) << "Run failed: " << tf_status.ToString();
 
-    const int64 run_end_time = absl::ToUnixMicros(clock_->TimeNow());
+    const int64_t run_end_time = absl::ToUnixMicros(clock_->TimeNow());
     cc->GetCounter(kTotalSessionRunsTimeUsecsCounterSuffix)
         ->IncrementBy(run_end_time - run_start_time);
     cc->GetCounter(kTotalNumSessionRunsCounterSuffix)->Increment();
@@ -565,7 +578,11 @@ class TensorFlowInferenceCalculator : public CalculatorBase {
 
     absl::WriterMutexLock l(&mutex_);
     // Set that we want to split on each index of the 0th dimension.
-    std::vector<tf::int64> split_vector(options_.batch_size(), 1);
+    std::vector<tf::int64> split_vector(
+        options_.pad_to_batch_size()
+            ? options_.batch_size()
+            : inference_state->batch_timestamps_.size(),
+        1);
     for (int i = 0; i < output_tensor_names.size(); ++i) {
       if (options_.batch_size() == 1) {
         if (cc->Outputs().HasTag(output_name_in_signature[i])) {
@@ -594,7 +611,7 @@ class TensorFlowInferenceCalculator : public CalculatorBase {
     }
 
     // Get end time and report.
-    const int64 end_time = absl::ToUnixMicros(clock_->TimeNow());
+    const int64_t end_time = absl::ToUnixMicros(clock_->TimeNow());
     cc->GetCounter(kTotalUsecsCounterSuffix)
         ->IncrementBy(end_time - start_time);
     cc->GetCounter(kTotalProcessedTimestampsCounterSuffix)
@@ -633,7 +650,7 @@ class TensorFlowInferenceCalculator : public CalculatorBase {
 
   // The static singleton semaphore to throttle concurrent session runs.
   static SimpleSemaphore* get_session_run_throttle(
-      int32 max_concurrent_session_runs) {
+      int32_t max_concurrent_session_runs) {
     static SimpleSemaphore* session_run_throttle =
         new SimpleSemaphore(max_concurrent_session_runs);
     return session_run_throttle;

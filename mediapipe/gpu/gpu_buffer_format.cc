@@ -28,6 +28,12 @@ namespace mediapipe {
 #define GL_HALF_FLOAT 0x140B
 #endif  // GL_HALF_FLOAT
 
+#ifdef __EMSCRIPTEN__
+#ifndef GL_HALF_FLOAT_OES
+#define GL_HALF_FLOAT_OES 0x8D61
+#endif  // GL_HALF_FLOAT_OES
+#endif  // __EMSCRIPTEN__
+
 #if !MEDIAPIPE_DISABLE_GPU
 #ifdef GL_ES_VERSION_2_0
 static void AdaptGlTextureInfoForGLES2(GlTextureInfo* info) {
@@ -48,6 +54,12 @@ static void AdaptGlTextureInfoForGLES2(GlTextureInfo* info) {
     case GL_RG8:
       info->gl_internal_format = info->gl_format = GL_RG_EXT;
       return;
+#ifdef __EMSCRIPTEN__
+    case GL_RGBA16F:
+      info->gl_internal_format = GL_RGBA;
+      info->gl_type = GL_HALF_FLOAT_OES;
+      return;
+#endif  // __EMSCRIPTEN__
     default:
       return;
   }
@@ -204,6 +216,8 @@ ImageFormat::Format ImageFormatForGpuBufferFormat(GpuBufferFormat format) {
       return ImageFormat::SRGB;
     case GpuBufferFormat::kTwoComponentFloat32:
       return ImageFormat::VEC32F2;
+    case GpuBufferFormat::kRGBAFloat128:
+      return ImageFormat::VEC32F4;
     case GpuBufferFormat::kRGBA32:
       // TODO: this likely maps to ImageFormat::SRGBA
     case GpuBufferFormat::kGrayHalf16:
@@ -211,7 +225,10 @@ ImageFormat::Format ImageFormatForGpuBufferFormat(GpuBufferFormat format) {
     case GpuBufferFormat::kTwoComponent8:
     case GpuBufferFormat::kTwoComponentHalf16:
     case GpuBufferFormat::kRGBAHalf64:
-    case GpuBufferFormat::kRGBAFloat128:
+    case GpuBufferFormat::kNV12:
+    case GpuBufferFormat::kNV21:
+    case GpuBufferFormat::kI420:
+    case GpuBufferFormat::kYV12:
     case GpuBufferFormat::kUnknown:
       return ImageFormat::UNKNOWN;
   }
@@ -228,6 +245,8 @@ GpuBufferFormat GpuBufferFormatForImageFormat(ImageFormat::Format format) {
       return GpuBufferFormat::kGrayFloat32;
     case ImageFormat::VEC32F2:
       return GpuBufferFormat::kTwoComponentFloat32;
+    case ImageFormat::VEC32F4:
+      return GpuBufferFormat::kRGBAFloat128;
     case ImageFormat::GRAY8:
       return GpuBufferFormat::kOneComponent8;
     case ImageFormat::YCBCR420P:
